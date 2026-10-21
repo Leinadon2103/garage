@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titel %}Voertuig toevoegen{% endblock %}
+{% block inhoud %}
+<a href="/" class="terug">{{ icon("chevron-left") }} Garage</a>
+<div class="kop"><div><div class="eyebrow">Nieuw</div><h1>Voertuig toevoegen</h1></div></div>
+
+<div class="grid-2" style="align-items:start">
+  <div class="card">
+    <h2>1. Opzoeken bij de RDW</h2>
+    <p class="muted">Vul je kenteken in. Merk, model en bouwjaar worden automatisch ingevuld.</p>
+    <form method="post" action="/voertuigen/opzoeken">
+      <label for="zoek-kenteken">Kenteken</label>
+      <div class="zoekbalk">
+        <input id="zoek-kenteken" name="kenteken" value="{{ v.kenteken|plaat if v.kenteken else '' }}" placeholder="bijv. MD-12-AB"
+               autofocus required style="text-transform:uppercase;font-weight:700;letter-spacing:.06em">
+        <button type="submit" class="btn">{{ icon("search") }} Opzoeken</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>2. Controleren en opslaan</h2>
+    {% if gevonden %}<div class="melding ok">{{ icon("check") }}<p>Gevonden bij de RDW. Controleer de gegevens en sla op.</p></div>
+    {% else %}<p class="muted">Of vul alles zelf in, bijvoorbeeld bij een buitenlands kenteken.</p>{% endif %}
+    <form method="post" action="/voertuigen">
+      {% if v.rdw %}<input type="hidden" name="rdw_json" value='{{ v.rdw|tojson }}'>{% endif %}
+      <div class="velden">
+        <div class="veld"><label>Kenteken</label><input name="kenteken" value="{{ v.kenteken or '' }}" required></div>
+        <div class="veld"><label>Soort</label>
+          <select name="voertuigsoort" required>
+            {% for s in soorten %}<option {% if s == v.voertuigsoort %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="veld"><label>Merk</label><input name="merk" value="{{ v.merk or '' }}"></div>
+        <div class="veld"><label>Model</label><input name="model" value="{{ v.model or '' }}"></div>
+        <div class="veld"><label>Eerste toelating</label><input type="date" name="datum_eerste_toelating" value="{{ v.datum_eerste_toelating or '' }}"></div>
+        <div class="veld"><label>Kleur</label><input name="kleur" value="{{ v.kleur or '' }}"></div>
+        <div class="veld"><label>Cilinderinhoud (cc)</label><input type="number" name="cilinderinhoud" value="{{ v.cilinderinhoud or '' }}"></div>
+        <div class="veld"><label>Bijnaam (optioneel)</label><input name="bijnaam" placeholder="bijv. De Groene"></div>
+      </div>
+      <button type="submit" class="btn">{{ icon("check") }} Opslaan</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

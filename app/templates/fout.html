@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block titel %}Er ging iets mis{% endblock %}
+{% block inhoud %}
+<div class="card leeg">
+  {{ icon("triangle-alert") }}
+  <h2>Dat lukte niet</h2>
+  <p class="muted">Ga terug en probeer het opnieuw. Je gegevens zijn niet veranderd.</p>
+  <div class="rij" style="justify-content:center">
+    <button type="button" class="btn" onclick="history.back()">{{ icon("chevron-left") }} Terug</button>
+    <a href="/" class="btn ghost">Naar de garage</a>
+  </div>
+</div>
+{% endblock %}

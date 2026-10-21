@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block titel %}Documenten{% endblock %}
+{% block inhoud %}
+<a href="/voertuigen/{{ v.id }}" class="terug">{{ icon("chevron-left") }} {{ v.bijnaam or (v.merk ~ " " ~ v.model) }}</a>
+<div class="kop"><div><div class="eyebrow">{{ v.kenteken|plaat }}</div><h1>Documenten</h1>
+  <p class="muted">Kentekenbewijs, verzekering, aankoopfactuur, garantie en handleiding op één plek. Met een vervaldatum krijg je op tijd een herinnering.
+    Deze documenten gaan <strong>nooit</strong> mee in de verkoop-PDF.</p></div></div>
+
+<form method="post" enctype="multipart/form-data" class="card">
+  <h2>{{ icon("plus") }} Document toevoegen</h2>
+  <div class="velden">
+    <div class="veld"><label for="soort">Soort</label>
+      <select id="soort" name="soort" required>{% for s in soorten %}<option>{{ s }}</option>{% endfor %}</select></div>
+    <div class="veld"><label for="titel">Omschrijving (optioneel)</label><input id="titel" name="titel" placeholder="bijv. Polis Centraal Beheer 2026"></div>
+    <div class="veld"><label for="verval">Vervaldatum (optioneel)</label><input id="verval" type="date" name="vervaldatum"></div>
+    <div class="veld"><label for="bestand">Bestand (PDF, JPG of PNG)</label><input id="bestand" type="file" name="bestand" accept=".pdf,.jpg,.jpeg,.png" required></div>
+  </div>
+  <button class="btn">{{ icon("upload") }} Toevoegen</button>
+</form>
+
+<section class="sectie">
+  <h2>{{ icon("folder-open") }} Opgeslagen</h2>
+  {% if docs %}
+  <div class="card tabel-wrap"><table>
+    <thead><tr><th>Document</th><th>Soort</th><th>Vervaldatum</th><th></th></tr></thead>
+    <tbody>
+    {% for d in docs %}
+    <tr>
+      <td><a href="/documenten/{{ d.id }}" target="_blank">{{ icon("file") }} {{ d.titel or d.originele_naam }}</a></td>
+      <td class="muted">{{ d.soort }}</td>
+      <td>
+        <form method="post" action="/documenten/{{ d.id }}/vervaldatum" class="rij" style="flex-wrap:nowrap">
+          <input type="date" name="vervaldatum" value="{{ d.vervaldatum or '' }}" aria-label="Vervaldatum" style="height:36px;max-width:170px">
+          <button class="btn ghost klein">Datum wijzigen</button>
+          {% if d.vervaldatum and d.vervaldatum < vandaag %}<span class="chip bad">verlopen</span>{% endif %}
+        </form>
+      </td>
+      <td><form method="post" action="/documenten/{{ d.id }}/verwijderen" onsubmit="return confirm('Dit document definitief verwijderen?')">
+        <button class="linkknop" aria-label="Verwijderen">{{ icon("trash-2") }}</button></form></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="muted">Nog geen documenten.</p>{% endif %}
+</section>
+{% endblock %}

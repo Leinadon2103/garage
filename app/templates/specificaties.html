@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titel %}Specificaties{% endblock %}
+{% block inhoud %}
+<a href="/voertuigen/{{ v.id }}" class="terug">{{ icon("chevron-left") }} {{ v.bijnaam or (v.merk ~ " " ~ v.model) }}</a>
+<div class="kop"><div><div class="eyebrow">{{ v.kenteken|plaat }}</div><h1>Specificaties</h1>
+  <p class="muted">Welke olie, welk filter, welke bandenmaat: handig in de winkel en voor een koper. Lege regels worden niet opgeslagen.</p></div></div>
+{% if opgeslagen %}<div class="melding ok">{{ icon("check") }}<p>Specificaties opgeslagen.</p></div>{% endif %}
+
+<form method="post" class="card" id="specs">
+  <div class="tabel-wrap"><table class="types-tabel">
+    <thead><tr><th>Onderdeel</th><th>Waarde</th></tr></thead>
+    <tbody id="spec-rijen">
+    {% for veld in velden %}
+    <tr><td><input name="sleutel" value="{{ veld }}" aria-label="Onderdeel" maxlength="60"></td>
+        <td><input name="waarde" value="{{ waarden.get(veld, '') }}" placeholder="{{ voorbeeld.get(veld, '') }}" aria-label="{{ veld }}" maxlength="200"></td></tr>
+    {% endfor %}
+    <tr><td><input name="sleutel" placeholder="Eigen onderdeel…" aria-label="Eigen onderdeel" maxlength="60"></td>
+        <td><input name="waarde" aria-label="Waarde" maxlength="200"></td></tr>
+    </tbody>
+  </table></div>
+  <div class="rij" style="margin-top:16px">
+    <button class="btn">{{ icon("check") }} Opslaan</button>
+    <button type="button" class="btn ghost" onclick="const r = document.querySelector('#spec-rijen tr:last-child'); const k = r.cloneNode(true); k.querySelectorAll('input').forEach(i => i.value = ''); r.after(k);">{{ icon("plus") }} Regel toevoegen</button>
+  </div>
+</form>
+{% endblock %}

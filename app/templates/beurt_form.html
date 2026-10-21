@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block titel %}{{ "Onderhoud bewerken" if beurt.id else "Onderhoud toevoegen" }}{% endblock %}
+{% block inhoud %}
+<a href="/voertuigen/{{ v.id }}" class="terug">{{ icon("chevron-left") }} {{ v.bijnaam or (v.merk ~ " " ~ v.model) }}</a>
+<div class="kop">
+  <div><div class="eyebrow">{{ v.kenteken|plaat }}</div><h1>{{ "Onderhoud bewerken" if beurt.id else "Onderhoud toevoegen" }}</h1></div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="card"
+      action="{{ '/beurt/%s/bewerken'|format(beurt.id) if beurt.id else '/voertuigen/%s/beurt/nieuw'|format(v.id) }}">
+  <div class="veld">
+    <span class="veldkop">{{ "Factuur toevoegen" if beurt.id else "Begin met je factuur" }}</span>
+    <label class="upload" id="upload">
+      {{ icon("upload") }}
+      <strong>Sleep je factuur hierheen of klik om te kiezen</strong>
+      <span id="upload-tekst">PDF, JPG of PNG · bij een PDF vullen we bedrag, datum, km-stand en werkzaamheden alvast voor je in</span>
+      <input type="file" name="facturen" multiple accept=".pdf,.jpg,.jpeg,.png">
+    </label>
+  </div>
+  <div class="melding ok uitgelezen" id="uitgelezen">{{ icon("sparkles") }}<p></p></div>
+
+  <div class="veld">
+    <span class="veldkop">Wat is er gedaan?</span>
+    <details class="dropdown" id="types-dropdown">
+      <summary><span class="placeholder">Kies onderhoud…</span></summary>
+      <div class="paneel">
+        <input type="search" placeholder="Zoeken…" aria-label="Onderhoud zoeken">
+        <ul>
+          {% for t in types %}
+          <li><label><input type="checkbox" name="types" value="{{ t.id }}" {% if t.id in gekozen %}checked{% endif %}> {{ t.naam }}</label></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <div class="velden">
+    <div class="veld"><label for="datum">Datum</label><input id="datum" type="date" name="datum" value="{{ beurt.datum or vandaag }}" required></div>
+    <div class="veld"><label for="km">Kilometerstand</label><input id="km" type="number" name="kilometerstand" min="0" placeholder="{{ ('laatst: ' ~ (huidige_km|km) ~ ' km') if huidige_km else 'bijv. 12500' }}"
+         value="{{ beurt.kilometerstand if beurt.kilometerstand is not none else '' }}"></div>
+    <div class="veld"><label for="door">Uitgevoerd door</label><input id="door" name="uitgevoerd_door" value="{{ beurt.uitgevoerd_door or '' }}" placeholder="Zelf of naam garage" list="door-lijst"></div>
+    <div class="veld"><label for="kosten">Kosten (€)</label><input id="kosten" name="kosten" inputmode="decimal" value="{{ beurt.kosten if beurt.kosten is not none else '' }}" placeholder="0,00"></div>
+  </div>
+  <datalist id="door-lijst"><option value="Zelf"></datalist>
+  <div class="veld"><label for="opm">Opmerking</label><textarea id="opm" name="opmerking" rows="2" placeholder="bijv. Motul 7100 10W-40 gebruikt">{{ beurt.opmerking or '' }}</textarea></div>
+
+  {% if facturen %}
+  <div class="veld">
+    <span class="veldkop">Bestaande facturen</span>
+    {% for f in facturen %}
+    <div class="rij" style="padding:8px 0;border-bottom:1px solid var(--line)">
+      <a href="/facturen/{{ f.id }}" target="_blank">{{ icon("receipt") }} {{ f.originele_naam }}</a>
+      <a href="/facturen/{{ f.id }}/lakken" class="chip {{ 'ok' if f.gecontroleerd else 'warn' }}">{{ icon("eye-off") }} {{ "Opnieuw lakken" if f.gecontroleerd else "Persoonsgegevens weglakken" }}</a>
+      {% if f.origineel_pad %}<a href="/facturen/{{ f.id }}/origineel" target="_blank" class="muted" style="font-size:.85rem">origineel</a>{% endif %}
+      <button type="submit" form="del-{{ f.id }}" class="linkknop" style="margin-left:auto">{{ icon("trash-2") }}</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="rij">
+    <button type="submit" class="btn">{{ icon("check") }} Opslaan</button>
+    <a href="/voertuigen/{{ v.id }}" class="btn ghost">Annuleren</a>
+  </div>
+</form>
+
+{% for f in facturen %}
+<form id="del-{{ f.id }}" method="post" action="/facturen/{{ f.id }}/verwijderen" onsubmit="return confirm('Factuur verwijderen?')"></form>
+{% endfor %}
+
+{% if beurt.id %}
+<details class="gevaar">
+  <summary>Beurt verwijderen</summary>
+  <form method="post" action="/beurt/{{ beurt.id }}/verwijderen" onsubmit="return confirm('Deze beurt met facturen verwijderen?')" style="margin-top:12px">
+    <button type="submit" class="btn danger">{{ icon("trash-2") }} Beurt verwijderen</button>
+  </form>
+</details>
+{% endif %}
+
+<script>
+  // Multi-select: gekozen onderhoud als chips in de dropdown-kop, met zoekveld
+  const dd = document.getElementById("types-dropdown");
+  const kop = dd.querySelector("summary");
+  const bijwerken = () => {
+    const namen = [...dd.querySelectorAll("input[type=checkbox]:checked")].map(i => i.parentElement.textContent.trim());
+    kop.replaceChildren(...(namen.length
+      ? namen.map(n => Object.assign(document.createElement("span"), {className: "chip accent", textContent: n}))
+      : [Object.assign(document.createElement("span"), {className: "placeholder", textContent: "Kies onderhoud…"})]));
+  };
+  dd.addEventListener("change", bijwerken);
+  dd.querySelector("input[type=search]").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    dd.querySelectorAll("li").forEach(li => li.hidden = !li.textContent.toLowerCase().includes(q));
+  });
+  document.addEventListener("click", e => { if (!dd.contains(e.target)) dd.open = false; });
+  bijwerken();
+
+  // Uploadvak: bestandsnamen tonen en slepen ondersteunen
+  const vak = document.getElementById("upload"), invoer = vak.querySelector("input"), tekst = document.getElementById("upload-tekst");
+  const toon = () => {
+    if (!invoer.files.length) return;
+    tekst.textContent = [...invoer.files].map(f => f.name).join(", ");
+    uitlezen();
+  };
+  invoer.addEventListener("change", toon);
+  ["dragenter", "dragover"].forEach(t => vak.addEventListener(t, e => { e.preventDefault(); vak.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(t => vak.addEventListener(t, () => vak.classList.remove("over")));
+  vak.addEventListener("drop", e => { e.preventDefault(); invoer.files = e.dataTransfer.files; toon(); });
+
+  // Factuur uitlezen: alleen lege velden invullen, nooit iets overschrijven wat je zelf typte
+  const melding = document.getElementById("uitgelezen");
+  const formulier = vak.closest("form");
+  const zet = (naam, waarde, alleenAlsStandaard) => {
+    const veld = formulier.elements[naam];
+    if (waarde == null || !veld) return false;
+    if (veld.value && !(alleenAlsStandaard && veld.value === veld.defaultValue)) return false;
+    veld.value = waarde; return true;
+  };
+  async function uitlezen() {
+    const data = new FormData();
+    [...invoer.files].forEach(f => data.append("facturen", f));
+    melding.className = "melding ok uitgelezen zichtbaar";
+    melding.querySelector("p").textContent = "Factuur wordt uitgelezen…";
+    let r;
+    try {
+      r = await (await fetch("/voertuigen/{{ v.id }}/factuur-uitlezen", {method: "POST", body: data})).json();
+    } catch { r = {leesbaar: false}; }
+    if (!r.leesbaar) {
+      melding.className = "melding warn uitgelezen zichtbaar";
+      melding.querySelector("p").textContent = r.fout || "Deze factuur kon niet automatisch worden uitgelezen (foto of scan). Vul de gegevens zelf in.";
+      return;
+    }
+    const delen = [];
+    if (zet("kosten", r.kosten != null ? r.kosten.toFixed(2).replace(".", ",") : null)) delen.push("€ " + r.kosten.toFixed(2).replace(".", ","));
+    if ({{ "false" if beurt.id else "true" }} && zet("datum", r.datum, true)) delen.push(r.datum.split("-").reverse().join("-"));
+    if (zet("kilometerstand", r.kilometerstand)) delen.push(r.kilometerstand.toLocaleString("nl-NL") + " km");
+    if (zet("uitgevoerd_door", r.uitgevoerd_door)) delen.push(r.uitgevoerd_door);
+    const nieuw = [];
+    dd.querySelectorAll("input[type=checkbox]").forEach(c => {
+      if (r.types.includes(+c.value) && !c.checked) { c.checked = true; nieuw.push(c.parentElement.textContent.trim()); }
+    });
+    bijwerken();
+    if (nieuw.length) delen.push(nieuw.join(" + "));
+    melding.querySelector("p").textContent = delen.length
+      ? "Ingevuld uit je factuur: " + delen.join(" · ") + ". Controleer het even."
+      : "Factuur gelezen, maar er was niets nieuws om in te vullen. Controleer de velden zelf.";
+  }
+</script>
+{% endblock %}

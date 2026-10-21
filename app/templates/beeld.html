@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block titel %}Beeld kiezen{% endblock %}
+{% block inhoud %}
+<a href="/voertuigen/{{ v.id }}" class="terug">{{ icon("chevron-left") }} {{ v.bijnaam or (v.merk ~ " " ~ v.model) }}</a>
+<div class="kop">
+  <div><div class="eyebrow">{{ v.kenteken|plaat }}</div><h1>Kies een beeld</h1>
+    <p class="muted">Kies het 3D-model of de foto die het meest op jouw {{ (v.voertuigsoort or "voertuig")|lower }} lijkt. Het exacte model bestaat niet altijd.</p></div>
+  {% if v.beeld_type %}
+  <form method="post" action="/voertuigen/{{ v.id }}/beeld/verwijderen"><button class="btn danger klein">{{ icon("x") }} Beeld weghalen</button></form>
+  {% endif %}
+</div>
+
+<div class="grid-2" style="margin-bottom:28px">
+  <form method="get" class="card">
+    <label for="q">Anders zoeken</label>
+    <div class="zoekbalk"><input id="q" name="q" value="{{ zoekterm }}"><button class="btn ghost">{{ icon("search") }} Zoeken</button></div>
+  </form>
+  <form method="post" action="/voertuigen/{{ v.id }}/beeld/upload" enctype="multipart/form-data" class="card">
+    <span class="veldkop">Of gebruik een eigen foto</span>
+    <div class="zoekbalk"><input type="file" name="foto" accept=".jpg,.jpeg,.png" required style="padding-top:9px">
+      <button class="btn ghost">{{ icon("upload") }} Uploaden</button></div>
+  </form>
+</div>
+
+<section class="sectie" style="margin-top:0">
+  <h2>{{ icon("rotate-3d") }} 3D-modellen <small>· Sketchfab, draaibaar met je muis</small></h2>
+  {% if modellen %}
+  <div class="keuzes">
+    {% for m in modellen %}
+    <form method="post" action="/voertuigen/{{ v.id }}/beeld">
+      <input type="hidden" name="soort" value="3d"><input type="hidden" name="uid" value="{{ m.uid }}">
+      <input type="hidden" name="thumb" value="{{ m.thumb }}"><input type="hidden" name="titel" value="{{ m.naam }}">
+      <button class="keuze badge-3d"><img src="{{ m.thumb }}" alt="" loading="lazy">
+        <span class="label">{{ m.naam }}</span></button>
+    </form>
+    {% endfor %}
+  </div>
+  {% elif not fout %}<p class="muted">Geen 3D-modellen gevonden. Probeer een bredere zoekterm, bijvoorbeeld alleen merk + serie.</p>{% endif %}
+</section>
+
+<section class="sectie">
+  <h2>{{ icon("image") }} Foto's <small>· Wikimedia Commons</small></h2>
+  {% if fotos %}
+  <div class="keuzes">
+    {% for f in fotos %}
+    <form method="post" action="/voertuigen/{{ v.id }}/beeld">
+      <input type="hidden" name="soort" value="foto"><input type="hidden" name="thumb" value="{{ f.thumb }}">
+      <input type="hidden" name="titel" value="{{ f.naam }}"><input type="hidden" name="bron" value="{{ f.bron }}">
+      <button class="keuze"><img src="{{ f.thumb }}" alt="" loading="lazy"><span class="label">{{ f.naam }}</span></button>
+    </form>
+    {% endfor %}
+  </div>
+  {% elif not fout %}<p class="muted">Geen foto's gevonden.</p>{% endif %}
+</section>
+{% endblock %}
