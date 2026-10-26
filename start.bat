@@ -1,5 +1,7 @@
 @echo off
 cd /d "%~dp0"
+rem Altijd de testgegevens in data\, nooit de echte (ONDERHOUD_DATA staat systeembreed)
+set "ONDERHOUD_DATA=%~dp0data"
 if not exist .venv (
     echo Eerste keer: virtuele omgeving maken...
     python -m venv .venv
