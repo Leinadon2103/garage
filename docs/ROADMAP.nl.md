@@ -40,7 +40,7 @@ Gedaan staat ~~doorgestreept~~.
 | **P5** | Beter lakken: bij de eerste start om naam en adres vragen; extra patronen (klantnummer, geboortedatum, kenteken naar keuze); een waarschuwing zonder privé-termen | Namen worden nu alleen gevonden via eigen privé-termen | middel |
 | **P6** | Opmerkingen bij beurten staan in de verkoop-PDF: melding in het formulier, plus de keuze "opmerkingen niet tonen" bij de export | Vrije tekst kan persoonsgegevens bevatten | klein |
 | **P7** | Bewaartermijnen instelbaar: back-ups (nu 10 + 3 veiligheidskopieën), verlopen documenten na X maanden opruimen | Opslagbeperking, transparant | middel |
-| **P8** | OCR zonder tijdelijk bestand in `%TEMP%`: de afbeelding via stdin aan PowerShell geven | Bij een crash blijft nu een kopie van een factuur achter | klein |
+| ~~**P8**~~ | ~~OCR zonder tijdelijk bestand in `%TEMP%`: de afbeelding via stdin aan PowerShell geven~~ | Bij een crash bleef een kopie van een factuur achter | gedaan |
 | ~~**P9**~~ | ~~`PRAGMA secure_delete = ON` plus eenmalig `VACUUM`~~ | Verwijderde rijen bleven in vrije pagina's van de database en gingen mee in back-ups | gedaan |
 | ~~**P10**~~ | ~~Geen oorspronkelijke bestandsnaam op de foutpagina's van de verkoop-PDF~~ | Een bestandsnaam kan een naam bevatten | gedaan |
 
@@ -98,7 +98,7 @@ Gedaan staat ~~doorgestreept~~.
 1. ~~**Fundament:** S2, S3, G1, G2, G3.~~ Gedaan, met P9, P10, G9 en de omzetting naar Engelse code.
 2. **Grootste privacywinst:** ~~K3~~ (gedaan), dan P1 + P2 (samen ontwerpen, inclusief migratie en terugzetten), daarna P3, P4 en P6.
 3. **Vertrouwen voor de koper:** G4, G6, G7, en daarbij F3.
-4. **Afronden:** S1, P5, P7, P8, G5, G8, S4, K1, K2.
+4. **Afronden:** S1, P5, P7, ~~P8~~ (gedaan, met P1), G5, G8, S4, K1, K2.
 5. **Professionalisering, verspreid:** K4 t/m K9.
 6. **Features naar keuze:** F1, F2 en F4 zijn snel en waardevol; de rest op aanvraag.
 

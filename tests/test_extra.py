@@ -205,12 +205,12 @@ def test_ocr_read_invoice_photo(client):
 def test_ocr_suggestions_and_amounts_on_photo_and_scan(tmp_path):
     photo = tmp_path / "f.png"
     invoice_image(*INVOICE_LINES).save(photo)
-    sugg = redaction.suggestions(photo, "image/png", ["Jan de Vries"])
+    sugg = redaction.suggestions(photo.read_bytes(), "image/png", ["Jan de Vries"])
     reasons = {s["reason"] for s in sugg}
     assert {"jouw gegevens", "postcode", "adres"} <= reasons
 
     # redacting amounts on a photo: afterwards OCR reads no amounts any more, the rest it does
-    content, mime = redaction.redact_amounts(photo, "image/png")
+    content, mime = redaction.redact_amounts(photo.read_bytes(), "image/png")
     text = " ".join(w["text"] for w in ocr.recognize(Image.open(io.BytesIO(content))))
     assert mime == "image/png" and "54,00" not in text and "72,50" not in text and "Oliefilter" in text
 
@@ -221,8 +221,8 @@ def test_ocr_suggestions_and_amounts_on_photo_and_scan(tmp_path):
     page = doc.new_page(width=595, height=842)
     page.insert_image(page.rect, filename=str(photo))
     doc.save(scan)
-    assert {"postcode"} <= {s["reason"] for s in redaction.suggestions(scan, "application/pdf", [])}
-    content, mime = redaction.redact_amounts(scan, "application/pdf")
+    assert {"postcode"} <= {s["reason"] for s in redaction.suggestions(scan.read_bytes(), "application/pdf", [])}
+    content, mime = redaction.redact_amounts(scan.read_bytes(), "application/pdf")
     redacted = pymupdf.open(stream=content, filetype="pdf")
     text = " ".join(w["text"] for w in ocr.page(redacted[0]))
     assert mime == "application/pdf" and "54,00" not in text and "Oliefilter" in text
@@ -232,8 +232,8 @@ def test_without_ocr_everything_falls_back_cleanly(monkeypatch, tmp_path):
     monkeypatch.setattr(ocr, "available", lambda: False)
     photo = tmp_path / "f.png"
     invoice_image("Totaal 10,00").save(photo)
-    assert redaction.suggestions(photo, "image/png", []) == []
-    assert redaction.redact_amounts(photo, "image/png") is None
+    assert redaction.suggestions(photo.read_bytes(), "image/png", []) == []
+    assert redaction.redact_amounts(photo.read_bytes(), "image/png") is None
     assert invoice_reader.read(photo.read_bytes(), "image/png", []) == {"readable": False}
 
 
@@ -552,7 +552,7 @@ def test_amount_variants_and_half_scan(tmp_path, monkeypatch):
     path = tmp_path / "half.pdf"
     doc.save(path)
     monkeypatch.setattr(ocr, "available", lambda: False)
-    assert redaction.redact_amounts(path, "application/pdf") is None
+    assert redaction.redact_amounts(path.read_bytes(), "application/pdf") is None
 
 
 def test_invalid_dates_break_no_page(client):

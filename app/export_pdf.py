@@ -1,7 +1,6 @@
 """Sale PDF: cover page + history table, with all invoices as attachments behind it."""
 import io
 from datetime import date
-from pathlib import Path
 
 from PIL import Image, ImageOps
 from pypdf import PdfReader, PdfWriter
@@ -61,11 +60,11 @@ def _photo(vehicle):
     """Photo of the vehicle for the cover page (max. 7 x 5 cm), or None."""
     path = vehicle["image_path"] if "image_path" in vehicle.keys() else None
     try:
-        path = db.data_file(path)
-        with Image.open(path) as im:
+        content = db.read_file(path)
+        with Image.open(io.BytesIO(content)) as im:
             w, h = im.size
         scale = min(7 * cm / w, 5 * cm / h)
-        return RLImage(str(path), width=w * scale, height=h * scale)
+        return RLImage(io.BytesIO(content), width=w * scale, height=h * scale)
     except (OSError, ValueError):
         return None
 
@@ -185,13 +184,13 @@ def _header_above_page(page, text: str) -> None:
     page.merge_page(PdfReader(buf).pages[0], over=True)
 
 
-def _image_pdf(path: Path, header: str) -> PdfReader:
+def _image_pdf(content: bytes, header: str) -> PdfReader:
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     w, h = A4
     c.setFont("Helvetica-Bold", 11)
     c.drawString(2 * cm, h - 1.5 * cm, header)
-    with Image.open(path) as im:
+    with Image.open(io.BytesIO(content)) as im:
         img = ImageReader(ImageOps.exif_transpose(im))  # put phone photos upright
         iw, ih = img.getSize()
         scale = min((w - 4 * cm) / iw, (h - 4 * cm) / ih)
@@ -235,35 +234,34 @@ def create(vehicle, services: list[dict], with_costs: bool = True, km: list[dict
     for nr, (s, f) in enumerate(attachments, start=1):
         header = (f"Bijlage {nr} - {date.fromisoformat(s['date']).strftime('%d-%m-%Y')} - "
                   f"{', '.join(t['name'] for t in s['types'])}")
-        try:
-            path = db.data_file(f["path"])
-        except ValueError:
-            writer.append(_error_page(header, "het bestand heeft een ongeldig bestandspad"))
-            continue
         # one broken or missing attachment must not block the whole printout
         if not f["reviewed"]:  # never share an unreviewed original
             writer.append(_error_page(header, "de factuur is nog niet gecontroleerd op persoonsgegevens"))
             continue
         try:
+            content, mime = db.read_file(f["path"]), f["mime_type"]
+        except ValueError:
+            writer.append(_error_page(header, "het bestand heeft een ongeldig bestandspad"))
+            continue
+        except FileNotFoundError:
+            writer.append(_error_page(header, "het bestand ontbreekt"))
+            continue
+        try:
             if not with_costs:
                 # hiding costs also applies to the invoices: really remove amounts (only in this printout)
-                without_amounts = redaction.redact_amounts(path, f["mime_type"])
+                without_amounts = redaction.redact_amounts(content, mime)
                 if without_amounts is None:
                     writer.append(_error_page(header, "de factuur is weggelaten: er was geen tekst te herkennen, "
                                                       "dus bedragen kunnen niet worden verborgen"))
                     continue
-                path, mime = io.BytesIO(without_amounts[0]), without_amounts[1]
-            else:
-                mime = f["mime_type"]
+                content, mime = without_amounts
             if mime == "application/pdf":
-                reader = read_pdf(path)
+                reader = read_pdf(io.BytesIO(content))
                 start = len(writer.pages)
                 writer.append(reader)
                 _header_above_page(writer.pages[start], header)
             else:
-                writer.append(_image_pdf(path, header))
-        except FileNotFoundError:
-            writer.append(_error_page(header, "het bestand ontbreekt"))
+                writer.append(_image_pdf(content, header))
         except Exception as e:  # noqa: BLE001 - pypdf/PIL raise all kinds of errors
             writer.append(_error_page(header, f"het bestand is onleesbaar ({type(e).__name__})"))
 

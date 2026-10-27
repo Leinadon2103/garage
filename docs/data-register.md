@@ -65,7 +65,8 @@ Only when the feature is used, without an account or telemetry (see also PRIVACY
 ## Temporary copies
 | What | Location | Cleaned up |
 |---|---|---|
-| Image of an invoice for OCR | `%TEMP%\tmp*.png` | straight after OCR; after a crash it stays (P8) |
+| ~~Image of an invoice for OCR~~ | none any more: since P8 it goes to PowerShell through stdin, in memory only | - |
+| Half-written data file | `*.deel` next to the file in `facturen\`, `documenten\`, `beelden\` | straight away on an error; after a crash at the next start; never included in a backup |
 | Database copy for a backup | temporary folder in `%TEMP%` | straight after zipping |
 | Backup restored through "choose file" | temporary folder in `%TEMP%` | straight after restoring |
 | Unpacked backup, copy of the current database | `.herstel-tmp\` in the data folder | straight after restoring; after a crash at the next start (first the old state is put back if the restore was not finished) |

@@ -40,7 +40,7 @@ Done is ~~struck through~~.
 | **P5** | Better redaction: ask for name and address at the first start; extra patterns (customer number, date of birth, license plate optionally); a warning without private terms | Names are now only found through own private terms | medium |
 | **P6** | Service notes appear in the sale PDF: a hint in the form, plus the choice "hide notes" in the export | Free text can contain personal data | small |
 | **P7** | Configurable retention: backups (now 10 + 3 safety copies), clean up expired documents after X months | Storage limitation, transparent | medium |
-| **P8** | OCR without a temporary file in `%TEMP%`: pass the image to PowerShell through stdin | After a crash a copy of an invoice is now left behind | small |
+| ~~**P8**~~ | ~~OCR without a temporary file in `%TEMP%`: pass the image to PowerShell through stdin~~ | After a crash a copy of an invoice was left behind | done |
 | ~~**P9**~~ | ~~`PRAGMA secure_delete = ON` plus a one-off `VACUUM`~~ | Deleted rows stayed in free pages of the database and went into backups | done |
 | ~~**P10**~~ | ~~No original file name on the error pages of the sale PDF~~ | A file name can contain a name | done |
 
@@ -98,7 +98,7 @@ Done is ~~struck through~~.
 1. ~~**Foundation:** S2, S3, G1, G2, G3.~~ Done, together with P9, P10, G9 and the conversion to English code.
 2. **Biggest privacy gain:** ~~K3~~ (done), then P1 + P2 (designed together, including migration and restore), then P3, P4 and P6.
 3. **Trust for the buyer:** G4, G6, G7, and with it F3.
-4. **Finishing:** S1, P5, P7, P8, G5, G8, S4, K1, K2.
+4. **Finishing:** S1, P5, P7, ~~P8~~ (done, with P1), G5, G8, S4, K1, K2.
 5. **Professionalisation, spread out:** K4 to K9.
 6. **Features by choice:** F1, F2 and F4 are quick and valuable; the rest on request.
 

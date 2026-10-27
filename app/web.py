@@ -4,9 +4,10 @@ import logging
 import re
 from datetime import date
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import HTTPException, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
@@ -90,6 +91,19 @@ def mime_for(path: Path) -> str:
     return ALLOWED[path.suffix.lower()][0]
 
 
+def file_response(rel: str | None, name: str | None, what: str = "Bestand") -> Response:
+    """A data file (invoice, document), shown inline in the app window under its original name."""
+    try:
+        content = db.read_file(rel)
+    except ValueError:
+        raise HTTPException(404, f"{what} niet gevonden")
+    except FileNotFoundError:
+        raise HTTPException(404, f"{what} ontbreekt op schijf")
+    # filename* (RFC 5987): any name, also with quotes or non-ASCII characters, without breaking the header
+    return Response(content, media_type=mime_for(Path(rel)),
+                    headers={"Content-Disposition": f"inline; filename*=utf-8''{quote(name or Path(rel).name)}"})
+
+
 def parse_int(value: str | None) -> int | None:
     """'12.000' or '12000' -> 12000; empty -> None; otherwise ValueError."""
     value = (value or "").strip().replace(".", "").replace(" ", "")
@@ -123,7 +137,7 @@ def or_400(parser, value):
 def delete_files(paths) -> None:
     for path in filter(None, paths):
         try:
-            db.data_file(path).unlink(missing_ok=True)
+            db.delete_file(path)
         except (OSError, ValueError):  # e.g. file still open in a PDF viewer; the database is already updated
             logging.warning("Could not delete %s", path)
 
