@@ -17,6 +17,7 @@ Deze pakketten zitten in `Garage.exe` (versies zoals vastgelegd in `requirements
 | certifi | MPL-2.0 |
 | opentelemetry-api, python-multipart | Apache-2.0 |
 | packaging | Apache-2.0 of BSD-2-Clause |
+| cryptography | Apache-2.0 of BSD-3-Clause |
 | typing-extensions | PSF-2.0 |
 | pillow | MIT-CMU |
 | click, colorama, httpcore, httpx, idna, jinja2, markupsafe, pycparser, pygments, pypdf, pywebview, reportlab, starlette, uvicorn | BSD |

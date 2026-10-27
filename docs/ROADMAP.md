@@ -88,7 +88,7 @@ Done is ~~struck through~~.
 | ~~**K3**~~ | ~~Verify a backup after making it: open the zip and run `PRAGMA integrity_check`~~ | The backup is the only copy of the originals; P2 builds on it | done |
 | **K4** | Build the exe and installer in CI, with SHA-256 and a GitHub artifact attestation | Provably built from this source code; the free part of S5 | medium |
 | **K5** | `CHANGELOG.md`, one place for the version number, git tags | Traceable releases | small |
-| **K6** | Short threat model and recorded design decisions (e.g. DPAPI or password) | Choices in P1/P2 and S4 can be explained | small |
+| **K6** | Short threat model and recorded design decisions (e.g. DPAPI or password). P1/P2: [encryption.md](encryption.md); S4 still open | Choices in P1/P2 and S4 can be explained | small |
 | **K7** | Rule and test: `app.log` contains no invoice contents or redaction terms | Otherwise log files leak personal data | small |
 | **K8** | License check (e.g. `pip-licenses`) and SBOM in CI | `LICENSES.md` does not go stale unnoticed; AGPL obligations | small |
 | **K9** | Coverage (`pytest-cov`) | See which paths have no test, especially in restoring and migrating | small |
@@ -104,7 +104,7 @@ Done is ~~struck through~~.
 
 ## Open decisions for Daniel
 1. ~~Will the GitHub repo be public?~~ Yes, the repo is public. Still open: will the app be actively given to others? That decides S5, F8 and F9.
-2. P1: DPAPI (no password, tied to the Windows account) or an own password at startup?
+2. ~~P1: DPAPI or an own password?~~ Decided: DPAPI for the data on this pc (P1), a password on the backup (P2), so a restore on another pc works. Worked out in K6.
 3. P3: after a sale erase everything or keep an anonymised archive?
 4. Which features (F1 to F9) are preferred?
 5. Does Python 3.15 remain the base? The ecosystem is still catching up (see pyyaml, Dependabot), but `lazy import` depends on it.
