@@ -97,6 +97,7 @@ def create(folder: Path | None = None, prefix: str = PREFIX, keep_also: Path | N
                                 count += 1
                     z.writestr("garage-backup.json", json.dumps({"created": datetime.now().isoformat(timespec="seconds"),
                                                                  "files": count}))
+                _verify(part, count, Path(tmp))
             os.replace(part, folder / name)
         except Exception as e:
             part.unlink(missing_ok=True)
@@ -115,6 +116,28 @@ def create(folder: Path | None = None, prefix: str = PREFIX, keep_also: Path | N
                 db.set_setting(conn, "backup_last", datetime.now().isoformat(timespec="seconds"))
                 db.set_setting(conn, "backup_error", "")
         return folder / name
+
+
+def _verify(zip_path: Path, files: int, tmp: Path) -> None:
+    """Reads a fresh backup back before it gets its final name: every file intact (CRC), nothing missing and a
+    sound database. The backup is often the only other copy of the original invoices."""
+    check = tmp / "check.db"
+    try:
+        with zipfile.ZipFile(zip_path) as z:
+            ok = z.testzip() is None and len(z.namelist()) == files + 2  # + database and garage-backup.json
+            if ok:
+                with z.open(db.DB_NAME) as src, open(check, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+        if ok:
+            test = sqlite3.connect(check)
+            try:
+                ok = test.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            finally:
+                test.close()
+    except (zipfile.BadZipFile, KeyError, OSError, sqlite3.DatabaseError):
+        ok = False
+    if not ok:
+        raise BackupError("Back-up mislukt: bij de controle van de nieuwe back-up bleek die niet in orde. Probeer het opnieuw.")
 
 
 def _safe_name(name: str) -> bool:

@@ -47,6 +47,33 @@ def test_make_backup_list_and_retention(client, monkeypatch, tmp_path):
     assert len(backup.list_backups(tmp_path / "backups")) == backup.KEEP  # old ones are cleaned up
 
 
+real_copy_db = backup._copy_db
+
+
+def corrupt_copy(source, target):
+    """_copy_db replacement for create(): the copy in the zip gets a broken second page."""
+    real_copy_db(source, target)
+    with open(target, "r+b") as f:
+        page_size = int.from_bytes(f.read(18)[16:18])
+        f.seek(65536 if page_size == 1 else page_size)  # 1 in the header means 65536
+        f.write(b"\xff" * 64)
+
+
+@pytest.mark.parametrize("fault", ["database", "crc"])
+def test_backup_is_checked_before_it_counts(client, monkeypatch, tmp_path, fault):
+    vid = add_vehicle(client)
+    new_service(client, vid, files=[("invoices", ("f.pdf", pdf_bytes(), "application/pdf"))])
+    if fault == "database":
+        monkeypatch.setattr(backup, "_copy_db", corrupt_copy)
+    else:  # testzip() returns the first file with a wrong checksum
+        monkeypatch.setattr(zipfile.ZipFile, "testzip", lambda self: "facturen/f.pdf")
+    with pytest.raises(backup.BackupError, match="controle"):
+        backup.create()
+    assert not list((tmp_path / "backups").iterdir())  # no zip that looks good, no .deel left
+    with db.connect() as conn:
+        assert not db.setting(conn, "backup_last")
+
+
 def test_restore_brings_back_data_and_keeps_current_state(client, tmp_path):
     vid = add_vehicle(client, plate="AA-11-BB")
     new_service(client, vid, files=[("invoices", ("f.pdf", pdf_bytes(), "application/pdf"))])

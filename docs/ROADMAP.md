@@ -19,7 +19,7 @@ Status: October 2026, after version 1.3.0. This document is the handover to a ne
 - Redaction is real (`apply_redactions` + `scrub`). An unreviewed invoice never ends up in the sale PDF. EXIF is removed from photos.
 - A privacy overview in the app and in `PRIVACY.md`. Sketchfab only loads after a click.
 - Packages are pinned with hashes, with pip-audit, bandit and Dependabot (also for the GitHub Actions). License AGPL-3.0, with `LICENSES.md`.
-- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10 and G9, and the conversion to English code (migration 2). CI runs on GitHub; the repo is public and `main` is protected (see Working agreements).
+- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10, G9 and K3, and the conversion to English code (migration 2). CI runs on GitHub; the repo is public and `main` is protected (see Working agreements).
 
 ## Legal framework (estimate, not legal advice)
 - For personal use, Garage falls under the **household exemption** (Art. 2(2)(c) GDPR).
@@ -85,7 +85,7 @@ Done is ~~struck through~~.
 |---|---|---|---|
 | **K1** | Split `main.py` into routers per subject: vehicles, services, invoices, image | Overview; the file is about 500 lines | medium |
 | **K2** | `ruff` (formatting and lint) and a type check (`pyright`) in `build.bat` and CI | Catch errors earlier | small |
-| **K3** | Verify a backup after making it: open the zip and run `PRAGMA integrity_check` | The backup is the only copy of the originals; P2 builds on it | small |
+| ~~**K3**~~ | ~~Verify a backup after making it: open the zip and run `PRAGMA integrity_check`~~ | The backup is the only copy of the originals; P2 builds on it | done |
 | **K4** | Build the exe and installer in CI, with SHA-256 and a GitHub artifact attestation | Provably built from this source code; the free part of S5 | medium |
 | **K5** | `CHANGELOG.md`, one place for the version number, git tags | Traceable releases | small |
 | **K6** | Short threat model and recorded design decisions (e.g. DPAPI or password) | Choices in P1/P2 and S4 can be explained | small |
@@ -96,7 +96,7 @@ Done is ~~struck through~~.
 
 ## Suggested order
 1. ~~**Foundation:** S2, S3, G1, G2, G3.~~ Done, together with P9, P10, G9 and the conversion to English code.
-2. **Biggest privacy gain:** K3, then P1 + P2 (designed together, including migration and restore), then P3, P4 and P6.
+2. **Biggest privacy gain:** ~~K3~~ (done), then P1 + P2 (designed together, including migration and restore), then P3, P4 and P6.
 3. **Trust for the buyer:** G4, G6, G7, and with it F3.
 4. **Finishing:** S1, P5, P7, P8, G5, G8, S4, K1, K2.
 5. **Professionalisation, spread out:** K4 to K9.
