@@ -32,7 +32,7 @@ Welke gegevens Garage bewaart en wat er naar buiten gaat, staat in [PRIVACY.nl.m
   - draait de tests;
   - bouwt `Garage.exe` met PyInstaller en draait de zelftest daarvan (`Garage.exe --self-test`);
   - bouwt het installatieprogramma met Inno Setup 6, in `build\installer\`. Pas het versienummer aan in `installer.iss` en `tools\version.txt`.
-- **CI** (`.github/workflows/ci.yml`) draait dezelfde controles en de tests bij elke push naar `main` en elk pull request.
+- **CI** (`.github/workflows/ci.yml`) draait dezelfde controles en de tests bij elke push naar `main` en elk pull request. `main` is beschermd: wijzigingen gaan via een pull request, en die kan alleen gemerged worden als de CI slaagt.
 
 Verder: in [docs/](docs/) staan de [roadmap](docs/ROADMAP.nl.md), het [gegevensregister](docs/data-register.nl.md), de [datadictionary](docs/data-dictionary.nl.md) en een [woordenlijst](docs/glossary.md) met Nederlandse en Engelse termen.
 
