@@ -1,0 +1,5 @@
+# Regeleinden vastleggen in de repo, los van ieders git-instelling (core.autocrlf): overal LF, zodat werkmap,
+# CI-runner en repo gelijk zijn. Batchbestanden CRLF: cmd leest labels (goto) in een LF-bestand soms verkeerd.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
