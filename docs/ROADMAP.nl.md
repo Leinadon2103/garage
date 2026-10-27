@@ -19,7 +19,7 @@ Stand: oktober 2026, na versie 1.3.0. Dit document is de overdracht naar een nie
 - Weglakken is echt (`apply_redactions` + `scrub`). Een ongecontroleerde factuur komt nooit in de verkoop-PDF. Van foto's wordt EXIF verwijderd.
 - Een privacyoverzicht in de app en in `PRIVACY.md`. Sketchfab laadt pas na een klik.
 - Pakketten liggen vast met hashes, met pip-audit, bandit en Dependabot (ook voor de GitHub Actions). Licentie AGPL-3.0, met `LICENSES.md`.
-- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10 en G9, en de omzetting naar Engelse code (migratie 2). CI draait op GitHub; de repo is openbaar en `main` is beschermd (zie Werkafspraken).
+- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10, G9 en K3, en de omzetting naar Engelse code (migratie 2). CI draait op GitHub; de repo is openbaar en `main` is beschermd (zie Werkafspraken).
 
 ## Juridisch kader (inschatting, geen juridisch advies)
 - Voor eigen gebruik valt Garage onder de **huishoudelijke uitzondering** (art. 2 lid 2 sub c AVG).
@@ -85,7 +85,7 @@ Gedaan staat ~~doorgestreept~~.
 |---|---|---|---|
 | **K1** | `main.py` opsplitsen in routers per onderwerp: voertuigen, beurten, facturen, beeld | Overzicht; het bestand is ca. 500 regels | middel |
 | **K2** | `ruff` (opmaak en lint) en een typecontrole (`pyright`) in `build.bat` en CI | Fouten eerder zien | klein |
-| **K3** | Back-up controleren na het maken: zip openen en `PRAGMA integrity_check` | De back-up is de enige kopie van de originelen; P2 bouwt erop voort | klein |
+| ~~**K3**~~ | ~~Back-up controleren na het maken: zip openen en `PRAGMA integrity_check`~~ | De back-up is de enige kopie van de originelen; P2 bouwt erop voort | gedaan |
 | **K4** | Exe en installatieprogramma bouwen in CI, met SHA-256 en GitHub artifact attestation | Aantoonbaar gebouwd uit deze broncode; gratis deel van S5 | middel |
 | **K5** | `CHANGELOG.md`, één plek voor het versienummer, git-tags | Releases navolgbaar | klein |
 | **K6** | Korte dreigingsanalyse en vastgelegde ontwerpbeslissingen (bijv. DPAPI of wachtwoord) | Keuzes in P1/P2 en S4 uitlegbaar | klein |
@@ -96,7 +96,7 @@ Gedaan staat ~~doorgestreept~~.
 
 ## Voorgestelde volgorde
 1. ~~**Fundament:** S2, S3, G1, G2, G3.~~ Gedaan, met P9, P10, G9 en de omzetting naar Engelse code.
-2. **Grootste privacywinst:** K3, dan P1 + P2 (samen ontwerpen, inclusief migratie en terugzetten), daarna P3, P4 en P6.
+2. **Grootste privacywinst:** ~~K3~~ (gedaan), dan P1 + P2 (samen ontwerpen, inclusief migratie en terugzetten), daarna P3, P4 en P6.
 3. **Vertrouwen voor de koper:** G4, G6, G7, en daarbij F3.
 4. **Afronden:** S1, P5, P7, P8, G5, G8, S4, K1, K2.
 5. **Professionalisering, verspreid:** K4 t/m K9.
