@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Kosten en km{% endblock %}
+{% block content %}
+<a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
+<div class="header"><div><div class="eyebrow">{{ v.license_plate|plate }}</div><h1>Kosten en km-verloop</h1></div></div>
+
+<div class="card key-figures">
+  <div><small class="muted">Totaal uitgegeven</small><strong>{{ total|euro if total else "–" }}</strong><small class="muted">{{ count }} beurt{{ "en" if count != 1 }} met kosten</small></div>
+  <div><small class="muted">Kosten per km</small><strong>{{ ("€ " ~ ("%.3f" if per_km < 0.1 else "%.2f")|format(per_km)).replace(".", ",") if per_km else "–" }}</strong><small class="muted">{{ ("over " ~ (driven|km) ~ " gereden km") if driven else "nog te weinig km-standen" }}</small></div>
+  <div><small class="muted">Gemiddeld per jaar</small><strong>{{ (total / per_year.bars|length)|euro if per_year.bars else "–" }}</strong><small class="muted">over {{ per_year.bars|length }} jaar</small></div>
+</div>
+
+<section class="section">
+  <h2>{{ icon("chart-column") }} Uitgaven per jaar</h2>
+  <div class="card">
+  {% if per_year.bars %}
+    {% set n = per_year.bars|length %}
+    {% set width = [64, (940 / n) - 16]|min %}
+    <svg class="chart" viewBox="0 0 1000 240" role="img" aria-label="Uitgaven per jaar">
+      {% for f in [0, 0.5, 1] %}
+      <line class="gridline" x1="48" x2="992" y1="{{ 196 - f * 170 }}" y2="{{ 196 - f * 170 }}"/>
+      <text class="axis" x="42" y="{{ 200 - f * 170 }}" text-anchor="end">{{ (per_year.max * f)|euro|replace(",00", "") }}</text>
+      {% endfor %}
+      {% for b in per_year.bars %}
+      {% set x = 52 + (loop.index0 + 0.5) * (940 / n) - width / 2 %}
+      {% set h = [b.height * 170, 2]|max %}
+      {% set top = 196 - h %}
+      <g class="bar-group" tabindex="0" data-tip="{{ b.year }}: {{ b.amount|euro }}">
+        <rect x="{{ x - 6 }}" y="20" width="{{ width + 12 }}" height="176" fill="transparent"/>
+        <path class="bar" d="M{{ x }},196 V{{ top + 4 }} Q{{ x }},{{ top }} {{ x + 4 }},{{ top }} H{{ x + width - 4 }} Q{{ x + width }},{{ top }} {{ x + width }},{{ top + 4 }} V196 Z"/>
+      </g>
+      <text class="axis" x="{{ x + width / 2 }}" y="216" text-anchor="middle">{{ b.year }}</text>
+      <text class="axis" x="{{ x + width / 2 }}" y="{{ top - 6 }}" text-anchor="middle" style="fill:var(--text)">{{ b.amount|euro }}</text>
+      {% endfor %}
+    </svg>
+    <details><summary class="muted" style="cursor:pointer;font-size:.9rem">Als tabel tonen</summary>
+      <table><thead><tr><th>Jaar</th><th>Uitgaven</th></tr></thead><tbody>
+        {% for b in per_year.bars|reverse %}<tr><td>{{ b.year }}</td><td>{{ b.amount|euro }}</td></tr>{% endfor %}
+      </tbody></table></details>
+  {% else %}<p class="muted">Nog geen beurten met kosten.</p>{% endif %}
+  </div>
+</section>
+
+{% if per_kind %}
+<section class="section">
+  <h2>{{ icon("wrench") }} Per soort onderhoud</h2>
+  <div class="card cost-bars">
+    {% for kind, amount, share in per_kind %}
+    <div class="cost-bar"><span>{{ kind }}</span><span class="track"><span style="width:{{ (share * 100)|round(1) }}%"></span></span><strong>{{ amount|euro }}</strong></div>
+    {% endfor %}
+    <small class="muted">Een beurt met meerdere klussen telt apart: de kosten zijn niet eerlijk over de klussen te verdelen.</small>
+  </div>
+</section>
+{% endif %}
+
+<section class="section" id="odometer">
+  <h2>{{ icon("gauge") }} Km-verloop</h2>
+  <div class="card">
+  {% if km %}
+    {% set points = km.points %}
+    <svg class="chart" viewBox="0 0 1000 240" role="img" aria-label="Kilometerstand door de tijd">
+      {% for f in [0, 0.5, 1] %}
+      <line class="gridline" x1="64" x2="992" y1="{{ 196 - f * 170 }}" y2="{{ 196 - f * 170 }}"/>
+      <text class="axis" x="58" y="{{ 200 - f * 170 }}" text-anchor="end">{{ (km.min + (km.max - km.min) * f)|round|int|km }}</text>
+      {% endfor %}
+      {% set line %}{% for p in points %}{{ "M" if loop.first else "L" }}{{ 68 + p.x * 920 }},{{ 196 - p.y * 170 }} {% endfor %}{% endset %}
+      <path class="area" d="{{ line }}L{{ 68 + points[-1].x * 920 }},196 L{{ 68 + points[0].x * 920 }},196 Z"/>
+      <path class="line" d="{{ line }}"/>
+      {% for p in points %}
+      <circle class="hit" cx="{{ 68 + p.x * 920 }}" cy="{{ 196 - p.y * 170 }}" r="12" tabindex="0" data-tip="{{ p.date|short_date }}: {{ p.km|km }} km"/>
+      <circle class="point" cx="{{ 68 + p.x * 920 }}" cy="{{ 196 - p.y * 170 }}" r="4"/>
+      {% endfor %}
+      <text class="axis" x="68" y="216">{{ km.start|short_date }}</text>
+      <text class="axis" x="988" y="216" text-anchor="end">{{ km.end|short_date }}</text>
+    </svg>
+  {% else %}<p class="muted">Nog te weinig km-standen voor een grafiek. Noteer de km-stand af en toe op de voertuigpagina.</p>{% endif %}
+
+    <h3 style="margin-top:20px">Alle km-registraties</h3>
+    {% set source_label = {"service": "onderhoudsbeurt", "reading": "genoteerd", "storage_start": "stalling in", "storage_end": "stalling uit"} %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Datum</th><th>Km-stand</th><th>Bron</th><th></th></tr></thead>
+      <tbody>
+      {% for r in history %}
+      <tr><td>{{ r.date|short_date }}</td><td>{{ r.odometer_km|km }}</td><td class="muted">{{ source_label.get(r.source, r.source) }}</td>
+        <td>{% if r.source == "reading" %}<form method="post" action="/odometer/{{ r.id }}/delete" onsubmit="return confirm('Deze km-registratie verwijderen?')"><button class="link-button" aria-label="Verwijderen">{{ icon("trash-2") }}</button></form>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="4" class="muted">Nog geen km-standen.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</section>
+{% endblock %}

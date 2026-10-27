@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Onderhoudsschema{% endblock %}
+{% block content %}
+<a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
+<div class="header">
+  <div><div class="eyebrow">{{ v.license_plate|plate }}</div><h1>Onderhoudsschema</h1>
+    <p class="muted">Hoe vaak onderhoud nodig is, bepaalt de fabrikant per model. Het staat in je instructieboekje of onderhoudsboekje.
+      De ingevulde standaardwaarden zijn algemene vuistregels. Vervang ze door de waarden voor jouw {{ v.make }} {{ v.model }}.</p></div>
+</div>
+
+{% if saved %}<div class="notice ok">{{ icon("check") }}<p>Schema opgeslagen. De planning gebruikt nu deze waarden.</p></div>{% endif %}
+
+<form method="post" class="card">
+  <div class="field" style="max-width:520px">
+    <label for="source">Bron (optioneel)</label>
+    <input id="source" name="schedule_source" value="{{ v.schedule_source or '' }}" placeholder="bijv. Instructieboekje, p. 112">
+  </div>
+  <div class="table-wrap">
+    <table class="interval-table">
+      <thead><tr><th>Onderhoud</th><th>Elke … km</th><th>Elke … maanden</th></tr></thead>
+      <tbody>
+      {% for t in types %}
+      {% set c = custom.get(t.id) %}
+      <tr>
+        <td>{{ t.name }}{% if c %} <span class="chip ok" style="font-size:.7rem;padding:2px 8px">aangepast</span>{% endif %}</td>
+        <td><input type="number" min="0" name="km_{{ t.id }}" aria-label="{{ t.name }}: km"
+                   value="{{ (c[0] if c else t.interval_km) or '' }}" placeholder="">
+          <span class="default">vuistregel: {{ t.interval_km|km if t.interval_km else "geen" }}</span></td>
+        <td><input type="number" min="0" name="months_{{ t.id }}" aria-label="{{ t.name }}: maanden"
+                   value="{{ (c[1] if c else t.interval_months) or '' }}" placeholder="">
+          <span class="default">vuistregel: {{ t.interval_months or "geen" }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:.88rem;margin-top:16px">Leeg = geen herinnering. Voor elk onderhoud geldt: wat het eerst komt, km of tijd.</p>
+  <button type="submit" class="btn">{{ icon("check") }} Schema opslaan</button>
+</form>
+{% endblock %}

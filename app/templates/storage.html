@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Stalling{% endblock %}
+{% block content %}
+<a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
+<div class="header"><div><div class="eyebrow">{{ v.license_plate|plate }}</div>
+  <h1>{{ "Uit de stalling halen" if active else "In de stalling zetten" }}</h1>
+  <p class="muted">{% if active %}In de stalling sinds {{ active.start_date|short_date }}{% if active.start_km %} bij {{ active.start_km|km }} km{% endif %}.
+    {% else %}Tijdens de stalling krijg je geen herinneringen voor dit voertuig. De km-stand bij wegzetten en ophalen komt in de historie, goed bewijs voor een koper.{% endif %}</p></div></div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>{{ icon("list-checks") }} Checklist</h2>
+    <ul class="checklist">
+      {% for item in checklist %}<li><label><input type="checkbox"><span>{{ item }}</span></label></li>{% endfor %}
+    </ul>
+    {% if active and overdue %}
+    <div class="notice warn">{{ icon("triangle-alert") }}<p><strong>Ook aan de beurt:</strong>
+      {% for p in overdue %}{{ p.name|lower }} ({{ p.text }}){{ ", " if not loop.last }}{% endfor %}.</p></div>
+    {% endif %}
+  </div>
+
+  <form method="post" action="/vehicles/{{ v.id }}/storage/{{ 'end' if active else 'start' }}" class="card">
+    <h2>{{ icon("sun" if active else "snowflake") }} {{ "Ophalen" if active else "Wegzetten" }}</h2>
+    <div class="field"><label for="date">Datum</label><input id="date" type="date" name="date" value="{{ today }}" max="{{ today }}" required></div>
+    <div class="field"><label for="km">Kilometerstand (aanbevolen)</label>
+      <input id="km" type="number" name="odometer_km" min="0" value="{{ current_km or '' }}" placeholder="bijv. 12500">
+      <small class="muted">Controleer of dit klopt met de teller.</small></div>
+    <button class="btn">{{ icon("check") }} {{ "Uit de stalling gehaald" if active else "In de stalling gezet" }}</button>
+  </form>
+</div>
+
+{% if periods %}
+<section class="section">
+  <h2>{{ icon("calendar") }} Stallingsperiodes</h2>
+  <div class="card table-wrap"><table>
+    <thead><tr><th>Van</th><th>Tot</th><th>Km in</th><th>Km uit</th><th></th></tr></thead>
+    <tbody>{% for p in periods %}
+      <tr><td>{{ p.start_date|short_date }}</td><td>{{ p.end_date|short_date if p.end_date else "nu" }}</td>
+          <td>{{ p.start_km|km if p.start_km else "–" }}</td><td>{{ p.end_km|km if p.end_km else "–" }}</td>
+          <td><form method="post" action="/storage/{{ p.id }}/delete" onsubmit="return confirm('Deze stallingsperiode verwijderen? (bijv. om een verkeerde km-stand te corrigeren)')">
+            <button class="link-button" aria-label="Stallingsperiode verwijderen">{{ icon("trash-2") }}</button></form></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
+{% endblock %}

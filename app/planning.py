@@ -1,17 +1,17 @@
-"""Bepaalt per onderhoudstype wanneer het weer nodig is (op km en/of tijd, wat eerst komt)."""
+"""Works out per maintenance type when it is due again (by km and/or time, whichever comes first)."""
 from datetime import date
 
-ORANJE_KM_FRACTIE = 0.10
-ORANJE_DAGEN = 31
+ORANGE_KM_FRACTION = 0.10
+ORANGE_DAYS = 31
 
 
-def plus_maanden(d: date, maanden: int) -> date:
-    m = d.month - 1 + maanden
-    jaar, maand = d.year + m // 12, m % 12 + 1
-    # dag afkappen op einde maand (31 jan + 1 maand = 28/29 feb)
-    for dag in (d.day, 30, 29, 28):
+def add_months(d: date, months: int) -> date:
+    m = d.month - 1 + months
+    year, month = d.year + m // 12, m % 12 + 1
+    # clip the day to the end of the month (31 Jan + 1 month = 28/29 Feb)
+    for day in (d.day, 30, 29, 28):
         try:
-            return date(jaar, maand, dag)
+            return date(year, month, day)
         except ValueError:
             continue
     raise ValueError(d)
@@ -21,109 +21,105 @@ def _km(km: int) -> str:
     return f"{km:,}".replace(",", ".")
 
 
-def _duur(dagen: int) -> str:
-    if dagen < 45:
-        return f"{dagen} dag{'en' if dagen != 1 else ''}"
-    maanden = round(dagen / 30.4)
-    return f"{maanden} maand{'en' if maanden != 1 else ''}"
+def _duration(days: int) -> str:
+    if days < 45:
+        return f"{days} dag{'en' if days != 1 else ''}"
+    months = round(days / 30.4)
+    return f"{months} maand{'en' if months != 1 else ''}"
 
 
-def status(type_, laatste_km: int | None, laatste_datum: date, huidige_km: int | None, vandaag: date) -> dict:
-    """Status van één type op basis van de laatste keer dat het gedaan is."""
-    volgende_km = (
-        laatste_km + type_["interval_km"] if type_["interval_km"] and laatste_km is not None else None
-    )
-    volgende_datum = (
-        plus_maanden(laatste_datum, type_["interval_maanden"]) if type_["interval_maanden"] else None
-    )
+def status(type_, last_km: int | None, last_date: date, current_km: int | None, today: date) -> dict:
+    """Status of one type, based on the last time it was done."""
+    next_km = last_km + type_["interval_km"] if type_["interval_km"] and last_km is not None else None
+    next_date = add_months(last_date, type_["interval_months"]) if type_["interval_months"] else None
 
-    kleur = "groen"
-    if volgende_km is not None and huidige_km is not None:
-        if huidige_km >= volgende_km:
-            kleur = "rood"
-        elif volgende_km - huidige_km <= type_["interval_km"] * ORANJE_KM_FRACTIE:
-            kleur = "oranje"
-    if volgende_datum is not None and kleur != "rood":
-        dagen = (volgende_datum - vandaag).days
-        if dagen <= 0:
-            kleur = "rood"
-        elif dagen <= ORANJE_DAGEN:
-            kleur = "oranje"
+    color = "green"
+    if next_km is not None and current_km is not None:
+        if current_km >= next_km:
+            color = "red"
+        elif next_km - current_km <= type_["interval_km"] * ORANGE_KM_FRACTION:
+            color = "orange"
+    if next_date is not None and color != "red":
+        days = (next_date - today).days
+        if days <= 0:
+            color = "red"
+        elif days <= ORANGE_DAYS:
+            color = "orange"
 
-    # voortgang (0..1+) en een leesbare tekst, op basis van wat het dichtst bij is
-    km_deel = tijd_deel = None
-    if volgende_km is not None and huidige_km is not None:
-        km_deel = (huidige_km - laatste_km) / type_["interval_km"]
-    if volgende_datum is not None:
-        tijd_deel = (vandaag - laatste_datum).days / max(1, (volgende_datum - laatste_datum).days)
-    if km_deel is not None and (tijd_deel is None or km_deel >= tijd_deel):
-        rest = volgende_km - huidige_km
-        tekst = f"nog {_km(rest)} km" if rest > 0 else f"{_km(-rest)} km te laat"
-    elif tijd_deel is not None:
-        rest = (volgende_datum - vandaag).days
-        tekst = f"nog {_duur(rest)}" if rest > 0 else f"{_duur(-rest)} te laat"
+    # progress (0..1+) and a readable text, based on whatever is closest
+    km_part = time_part = None
+    if next_km is not None and current_km is not None:
+        km_part = (current_km - last_km) / type_["interval_km"]
+    if next_date is not None:
+        time_part = (today - last_date).days / max(1, (next_date - last_date).days)
+    if km_part is not None and (time_part is None or km_part >= time_part):
+        left = next_km - current_km
+        text = f"nog {_km(left)} km" if left > 0 else f"{_km(-left)} km te laat"
+    elif time_part is not None:
+        left = (next_date - today).days
+        text = f"nog {_duration(left)}" if left > 0 else f"{_duration(-left)} te laat"
     else:
-        tekst = ""
+        text = ""
 
     return {
-        "naam": type_["naam"],
-        "deel": max(d for d in (km_deel, tijd_deel, 0) if d is not None),
-        "tekst": tekst,
-        "laatste_datum": laatste_datum,
-        "laatste_km": laatste_km,
-        "volgende_km": volgende_km,
-        "volgende_datum": volgende_datum,
-        "kleur": kleur,
+        "name": type_["name"],
+        "progress": max(d for d in (km_part, time_part, 0) if d is not None),
+        "text": text,
+        "last_date": last_date,
+        "last_km": last_km,
+        "next_km": next_km,
+        "next_date": next_date,
+        "color": color,
     }
 
 
-def overzicht(beurten: list[dict], huidige_km: int | None, vandaag: date | None = None,
-              intervallen: dict | None = None) -> list[dict]:
-    """Per type met een interval: status t.o.v. de laatste beurt waarin het zat.
+def overview(services: list[dict], current_km: int | None, today: date | None = None,
+             intervals: dict | None = None) -> list[dict]:
+    """Per type with an interval: the status relative to the last service that included it.
 
-    `beurten` moet nieuwste-eerst gesorteerd zijn (zoals db.beurten teruggeeft).
-    `intervallen` = eigen waarden van dit voertuig ({type_id: (km, maanden)}); anders geldt de vuistregel.
-    Types die nooit gedaan zijn, tonen we niet: zonder startpunt valt er niets te plannen.
+    `services` must be sorted newest first (as db.services returns them).
+    `intervals` = custom values of this vehicle ({type_id: (km, months)}); otherwise the rule of thumb applies.
+    Types that were never done are not shown: without a starting point there is nothing to plan.
     """
-    vandaag = vandaag or date.today()
-    intervallen = intervallen or {}
-    gezien = {}
-    for b in beurten:
-        for t in b["types"]:
-            if t["id"] in gezien:
+    today = today or date.today()
+    intervals = intervals or {}
+    seen = {}
+    for s in services:
+        for t in s["types"]:
+            if t["id"] in seen:
                 continue
-            eigen = t["id"] in intervallen
-            km, mnd = intervallen[t["id"]] if eigen else (t["interval_km"], t["interval_maanden"])
-            if not (km or mnd):
+            custom = t["id"] in intervals
+            km, months = intervals[t["id"]] if custom else (t["interval_km"], t["interval_months"])
+            if not (km or months):
                 continue
-            t = {"id": t["id"], "naam": t["naam"], "interval_km": km, "interval_maanden": mnd}
-            gezien[t["id"]] = {**status(t, b["kilometerstand"], date.fromisoformat(b["datum"]), huidige_km, vandaag),
-                               "bron": "eigen" if eigen else "vuistregel"}
-    volgorde = {"rood": 0, "oranje": 1, "groen": 2}
-    return sorted(gezien.values(), key=lambda s: (volgorde[s["kleur"]], s["naam"]))
+            t = {"id": t["id"], "name": t["name"], "interval_km": km, "interval_months": months}
+            seen[t["id"]] = {**status(t, s["odometer_km"], date.fromisoformat(s["date"]), current_km, today),
+                             "source": "custom" if custom else "rule_of_thumb"}
+    order = {"red": 0, "orange": 1, "green": 2}
+    return sorted(seen.values(), key=lambda st: (order[st["color"]], st["name"]))
 
 
-# Afgeronde landelijke gemiddelden (km per jaar); alleen voor een ruwe schatting, nooit voor de planning.
-KM_PER_JAAR = {"Motorfiets": 3500, "Bromfiets": 2000, "Personenauto": 13000, "Bedrijfsauto": 18000}
+# Rounded national averages (km per year); only for a rough estimate, never for the planning.
+KM_PER_YEAR = {"Motorfiets": 3500, "Bromfiets": 2000, "Personenauto": 13000, "Bedrijfsauto": 18000}
 
 
-def km_schatting(voertuigsoort: str, eerste_toelating: str | None, vandaag: date | None = None) -> int | None:
-    if voertuigsoort not in KM_PER_JAAR or not eerste_toelating:
+def km_estimate(vehicle_type: str, first_registration: str | None, today: date | None = None) -> int | None:
+    if vehicle_type not in KM_PER_YEAR or not first_registration:
         return None
     try:
-        start = date.fromisoformat(eerste_toelating)
+        start = date.fromisoformat(first_registration)
     except ValueError:
         return None
-    jaren = max(0, ((vandaag or date.today()) - start).days / 365.25)
-    return int(round(jaren * KM_PER_JAAR[voertuigsoort], -2))
+    years = max(0, ((today or date.today()) - start).days / 365.25)
+    return int(round(years * KM_PER_YEAR[vehicle_type], -2))
 
 
-def vervalstatus(naam: str, datum: str, bron: str, vandaag: date | None = None) -> dict:
-    """Status van iets met een vaste vervaldatum (APK, verzekering, garantie)."""
-    vandaag = vandaag or date.today()
-    verval = date.fromisoformat(datum)
-    dagen = (verval - vandaag).days
-    kleur = "rood" if dagen < 0 else "oranje" if dagen <= ORANJE_DAGEN else "groen"
-    tekst = f"nog {_duur(dagen)}" if dagen > 0 else "vandaag" if dagen == 0 else f"{_duur(-dagen)} verlopen"
-    return {"naam": naam, "kleur": kleur, "tekst": tekst, "deel": min(1.0, max(0.0, 1 - dagen / 365)),
-            "laatste_datum": None, "laatste_km": None, "volgende_km": None, "volgende_datum": verval, "bron": bron}
+def expiry_status(name: str, expiry: str, source: str, today: date | None = None) -> dict:
+    """Status of something with a fixed expiry date (APK, insurance, warranty)."""
+    today = today or date.today()
+    expires = date.fromisoformat(expiry)
+    days = (expires - today).days
+    color = "red" if days < 0 else "orange" if days <= ORANGE_DAYS else "green"
+    text = f"nog {_duration(days)}" if days > 0 else "vandaag" if days == 0 else f"{_duration(-days)} verlopen"
+    return {"name": name, "color": color, "text": text, "progress": min(1.0, max(0.0, 1 - days / 365)),
+            "last_date": None, "last_km": None, "next_km": None, "next_date": expires, "source": source}

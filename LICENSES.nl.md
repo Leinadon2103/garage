@@ -1,5 +1,7 @@
 # Licenties
 
+*English: [LICENSES.md](LICENSES.md)*
+
 Garage valt onder de **GNU Affero General Public License v3.0** (zie [LICENSE](LICENSE)).
 Copyright (C) 2026 Daniel Goedknegt.
 
@@ -23,6 +25,6 @@ Deze pakketten zitten in `Garage.exe` (versies zoals vastgelegd in `requirements
 Daarnaast:
 - **Python** zelf (PSF-licentie) zit in `Garage.exe`.
 - **PyInstaller** bouwt de exe. De GPL-licentie van PyInstaller staat met een uitzondering toe dat je het resultaat onder een eigen licentie verspreidt.
-- **pytest**, **pip-audit** en **bandit** worden alleen gebruikt bij het ontwikkelen en zitten niet in de exe.
+- **pytest**, **httpx2** (met httpcore2 en truststore), **pip-audit** en **bandit** worden alleen gebruikt bij het ontwikkelen en zitten niet in de exe.
 
 Bijwerken: na een wijziging in `requirements.txt` deze lijst nalopen (licenties staan in de metadata van elk pakket).

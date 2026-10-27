@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}{{ "Onderhoud bewerken" if service.id else "Onderhoud toevoegen" }}{% endblock %}
+{% block content %}
+<a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
+<div class="header">
+  <div><div class="eyebrow">{{ v.license_plate|plate }}</div><h1>{{ "Onderhoud bewerken" if service.id else "Onderhoud toevoegen" }}</h1></div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="card"
+      action="{{ '/services/%s/edit'|format(service.id) if service.id else '/vehicles/%s/services/new'|format(v.id) }}">
+  <div class="field">
+    <span class="field-header">{{ "Factuur toevoegen" if service.id else "Begin met je factuur" }}</span>
+    <label class="upload" id="upload">
+      {{ icon("upload") }}
+      <strong>Sleep je factuur hierheen of klik om te kiezen</strong>
+      <span id="upload-text">PDF, JPG of PNG · bij een PDF vullen we bedrag, datum, km-stand en werkzaamheden alvast voor je in</span>
+      <input type="file" name="invoices" multiple accept=".pdf,.jpg,.jpeg,.png">
+    </label>
+  </div>
+  <div class="notice ok read-result" id="read-result">{{ icon("sparkles") }}<p></p></div>
+
+  <div class="field">
+    <span class="field-header">Wat is er gedaan?</span>
+    <details class="dropdown" id="types-dropdown">
+      <summary><span class="placeholder">Kies onderhoud…</span></summary>
+      <div class="panel">
+        <input type="search" placeholder="Zoeken…" aria-label="Onderhoud zoeken">
+        <ul>
+          {% for t in types %}
+          <li><label><input type="checkbox" name="types" value="{{ t.id }}" {% if t.id in chosen %}checked{% endif %}> {{ t.name }}</label></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <div class="fields">
+    <div class="field"><label for="date">Datum</label><input id="date" type="date" name="date" value="{{ service.date or today }}" required></div>
+    <div class="field"><label for="km">Kilometerstand</label><input id="km" type="number" name="odometer_km" min="0" placeholder="{{ ('laatst: ' ~ (current_km|km) ~ ' km') if current_km else 'bijv. 12500' }}"
+         value="{{ service.odometer_km if service.odometer_km is not none else '' }}"></div>
+    <div class="field"><label for="by">Uitgevoerd door</label><input id="by" name="performed_by" value="{{ service.performed_by or '' }}" placeholder="Zelf of naam garage" list="by-list"></div>
+    <div class="field"><label for="cost">Kosten (€)</label><input id="cost" name="cost" inputmode="decimal" value="{{ service.cost if service.cost is not none else '' }}" placeholder="0,00"></div>
+  </div>
+  <datalist id="by-list"><option value="Zelf"></datalist>
+  <div class="field"><label for="note">Opmerking</label><textarea id="note" name="note" rows="2" placeholder="bijv. Motul 7100 10W-40 gebruikt">{{ service.note or '' }}</textarea></div>
+
+  {% if invoices %}
+  <div class="field">
+    <span class="field-header">Bestaande facturen</span>
+    {% for f in invoices %}
+    <div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)">
+      <a href="/invoices/{{ f.id }}" target="_blank">{{ icon("receipt") }} {{ f.original_filename }}</a>
+      <a href="/invoices/{{ f.id }}/redact" class="chip {{ 'ok' if f.reviewed else 'warn' }}">{{ icon("eye-off") }} {{ "Opnieuw lakken" if f.reviewed else "Persoonsgegevens weglakken" }}</a>
+      {% if f.original_path %}<a href="/invoices/{{ f.id }}/original" target="_blank" class="muted" style="font-size:.85rem">origineel</a>{% endif %}
+      <button type="submit" form="del-{{ f.id }}" class="link-button" style="margin-left:auto">{{ icon("trash-2") }}</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="row">
+    <button type="submit" class="btn">{{ icon("check") }} Opslaan</button>
+    <a href="/vehicles/{{ v.id }}" class="btn ghost">Annuleren</a>
+  </div>
+</form>
+
+{% for f in invoices %}
+<form id="del-{{ f.id }}" method="post" action="/invoices/{{ f.id }}/delete" onsubmit="return confirm('Factuur verwijderen?')"></form>
+{% endfor %}
+
+{% if service.id %}
+<details class="danger-zone">
+  <summary>Beurt verwijderen</summary>
+  <form method="post" action="/services/{{ service.id }}/delete" onsubmit="return confirm('Deze beurt met facturen verwijderen?')" style="margin-top:12px">
+    <button type="submit" class="btn danger">{{ icon("trash-2") }} Beurt verwijderen</button>
+  </form>
+</details>
+{% endif %}
+
+<script>
+  // Multi-select: chosen maintenance as chips in the dropdown header, with a search field
+  const dd = document.getElementById("types-dropdown");
+  const header = dd.querySelector("summary");
+  const update = () => {
+    const names = [...dd.querySelectorAll("input[type=checkbox]:checked")].map(i => i.parentElement.textContent.trim());
+    header.replaceChildren(...(names.length
+      ? names.map(n => Object.assign(document.createElement("span"), {className: "chip accent", textContent: n}))
+      : [Object.assign(document.createElement("span"), {className: "placeholder", textContent: "Kies onderhoud…"})]));
+  };
+  dd.addEventListener("change", update);
+  dd.querySelector("input[type=search]").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    dd.querySelectorAll("li").forEach(li => li.hidden = !li.textContent.toLowerCase().includes(q));
+  });
+  document.addEventListener("click", e => { if (!dd.contains(e.target)) dd.open = false; });
+  update();
+
+  // Upload box: show file names and support dragging
+  const box = document.getElementById("upload"), input = box.querySelector("input"), text = document.getElementById("upload-text");
+  const show = () => {
+    if (!input.files.length) return;
+    text.textContent = [...input.files].map(f => f.name).join(", ");
+    readInvoice();
+  };
+  input.addEventListener("change", show);
+  ["dragenter", "dragover"].forEach(t => box.addEventListener(t, e => { e.preventDefault(); box.classList.add("dragover"); }));
+  ["dragleave", "drop"].forEach(t => box.addEventListener(t, () => box.classList.remove("dragover")));
+  box.addEventListener("drop", e => { e.preventDefault(); input.files = e.dataTransfer.files; show(); });
+
+  // Read the invoice: only fill empty fields, never overwrite what you typed yourself
+  const notice = document.getElementById("read-result");
+  const form = box.closest("form");
+  const fill = (name, value, onlyIfDefault) => {
+    const field = form.elements[name];
+    if (value == null || !field) return false;
+    if (field.value && !(onlyIfDefault && field.value === field.defaultValue)) return false;
+    field.value = value; return true;
+  };
+  async function readInvoice() {
+    const data = new FormData();
+    [...input.files].forEach(f => data.append("invoices", f));
+    notice.className = "notice ok read-result visible";
+    notice.querySelector("p").textContent = "Factuur wordt uitgelezen…";
+    let r;
+    try {
+      r = await (await fetch("/vehicles/{{ v.id }}/read-invoice", {method: "POST", body: data})).json();
+    } catch { r = {readable: false}; }
+    if (!r.readable) {
+      notice.className = "notice warn read-result visible";
+      notice.querySelector("p").textContent = r.error || "Deze factuur kon niet automatisch worden uitgelezen (foto of scan). Vul de gegevens zelf in.";
+      return;
+    }
+    const parts = [];
+    if (fill("cost", r.cost != null ? r.cost.toFixed(2).replace(".", ",") : null)) parts.push("€ " + r.cost.toFixed(2).replace(".", ","));
+    if ({{ "false" if service.id else "true" }} && fill("date", r.date, true)) parts.push(r.date.split("-").reverse().join("-"));
+    if (fill("odometer_km", r.odometer_km)) parts.push(r.odometer_km.toLocaleString("nl-NL") + " km");
+    if (fill("performed_by", r.performed_by)) parts.push(r.performed_by);
+    const added = [];
+    dd.querySelectorAll("input[type=checkbox]").forEach(c => {
+      if (r.types.includes(+c.value) && !c.checked) { c.checked = true; added.push(c.parentElement.textContent.trim()); }
+    });
+    update();
+    if (added.length) parts.push(added.join(" + "));
+    notice.querySelector("p").textContent = parts.length
+      ? "Ingevuld uit je factuur: " + parts.join(" · ") + ". Controleer het even."
+      : "Factuur gelezen, maar er was niets nieuws om in te vullen. Controleer de velden zelf.";
+  }
+</script>
+{% endblock %}

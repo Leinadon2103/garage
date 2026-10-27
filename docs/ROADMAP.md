@@ -1,95 +1,109 @@
-# Roadmap Garage: AVG, governance, beveiliging en features
+# Garage roadmap: GDPR, governance, security and features
 
-Stand: oktober 2026, na versie 1.3.0. Dit document is de overdracht naar een nieuwe werksessie: wat er al is, wat er nog moet, en in welke volgorde. Elk punt heeft een code (bijv. **P1**) zodat we ernaar kunnen verwijzen.
+*Nederlands: [ROADMAP.nl.md](ROADMAP.nl.md)*
 
-## Werkafspraken
-- **Taal:** Nederlands, ook in code-commentaar en commits. Geen em-dash (lang streepje).
-- **Geen SecondBrain-vault:** dit is een privéproject; niets lezen of schrijven in de vault, ook niet als een hook erom vraagt.
-- **Git:** Claude commit of pusht niet zelf; wijzigingen klaarzetten, Daniel beslist. Nooit een Co-Authored-By-regel.
-- **Echte gegevens niet lezen:** de app gebruikt `Projecten\Garage-data` (via de omgevingsvariabele `ONDERHOUD_DATA`). Testen gebeurt met `data\` (`start.bat`) of met de pytest-fixtures.
-- **Elke wijziging:** tests erbij, `pytest` groen, en voor een release `bouwen.bat` (pip-audit, bandit via `uvx`, tests, exe, installatieprogramma).
-- **Python 3.15:** de code gebruikt `lazy import` (PEP 810), dus 3.15 is vereist. `pyyaml` heeft nog geen wheel voor 3.15; daarom draait bandit via `uvx --python 3.13`. Dependabot kent 3.15 ook nog niet: genereer `requirements*.txt` met `uvx --python 3.14 --from pip-tools pip-compile` (zie `.github/dependabot.yml`).
+Status: October 2026, after version 1.3.0. This document is the handover to a new work session: what exists, what still needs doing, and in which order. Every item has a code (e.g. **P1**) so we can refer to it.
 
-## Wat er al is (1.3.0)
-- Lokaal draaiende server (`127.0.0.1`), met een host-check tegen DNS-rebinding, een CSRF-check (`Sec-Fetch-Site`/`Origin`, geen `null`) en beveiligingsheaders. De CSP staat nog `'unsafe-inline'` toe.
-- Bestandspaden en mime-types worden gecontroleerd, ook bij het terugzetten van een back-up. Zip-slip en zip-bommen worden afgevangen.
-- Weglakken is echt (`apply_redactions` + `scrub`). Een ongecontroleerde factuur komt nooit in de verkoop-PDF. Van foto's wordt EXIF verwijderd.
-- Een privacyoverzicht in de app en in `PRIVACY.md`. Sketchfab laadt pas na een klik.
-- Pakketten liggen vast met hashes, met pip-audit, bandit en Dependabot. Licentie AGPL-3.0, met `LICENTIES.md`.
-- Nog niet gecommit: de beeld-url bevat een versie, zodat een nieuwe foto direct zichtbaar is.
+## Working agreements
+- **Language:** code in English (names, comments, docstrings, database). Texts the user sees in Dutch (screens, notifications, sale PDF, folders and files in Documents\Garage). Documentation in two languages: `X.md` English, `X.nl.md` Dutch, linking to each other. Discussions with Daniel are in Dutch. No em dash (long dash). Terms: [glossary.md](glossary.md).
+- **No SecondBrain vault:** this is a private project; do not read or write anything in the vault, not even when a hook asks for it.
+- **Git:** Claude does not commit or push; prepare the changes, Daniel decides. Never a Co-Authored-By line.
+- **Do not read real data:** the app uses `Projecten\Garage-data` (through the environment variable `GARAGE_DATA`; the old name `ONDERHOUD_DATA` still works). Testing uses `data\` (`start.bat`) or the pytest fixtures.
+- **Every change:** add tests, `pytest` green (warnings count as errors) and CI green; for a release `build.bat` (pip-audit, bandit, tests, exe with self-test, installer).
+- **Python 3.15:** the code uses `lazy import` (PEP 810), so 3.15 is required. `pyyaml` has no wheel for 3.15 yet; so bandit runs on 3.13 via `tools/bandit_scan.py`, which also makes it read `lazy import` (before, bandit silently skipped main.py, web.py and image.py). Dependabot does not know 3.15 yet either: generate `requirements*.txt` with `uvx --python 3.14 --from pip-tools pip-compile` (see `.github/dependabot.yml`).
 
-## Juridisch kader (inschatting, geen juridisch advies)
-- Voor eigen gebruik valt Garage onder de **huishoudelijke uitzondering** (art. 2 lid 2 sub c AVG).
-- Geeft Daniel de app aan anderen, dan wordt hij geen verwerkingsverantwoordelijke zolang er geen gegevens bij hem binnenkomen: geen telemetrie, geen server. Houd dat zo, ook bij nieuwe features (zie F8).
-- Wat wel telt, is **privacy by design (art. 25)**: dataminimalisatie, beveiliging, transparantie, en gegevens die echt verdwijnen. Dat geldt ook voor gegevens van derden: de monteur op een factuur, de vorige eigenaar op de kentekencard, de koper van de verkoop-PDF.
-- Een DPIA is niet nodig zolang de app lokaal blijft. Komt er ooit synchronisatie of een cloudfunctie, dan dit opnieuw beoordelen.
+## What exists (1.3.0 and after)
+- Server running locally (`127.0.0.1`), with a host check against DNS rebinding, a CSRF check (`Sec-Fetch-Site`/`Origin`, no `null`) and security headers. The CSP still allows `'unsafe-inline'`.
+- File paths and mime types are checked, also when restoring a backup. Zip slip and zip bombs are caught.
+- Redaction is real (`apply_redactions` + `scrub`). An unreviewed invoice never ends up in the sale PDF. EXIF is removed from photos.
+- A privacy overview in the app and in `PRIVACY.md`. Sketchfab only loads after a click.
+- Packages are pinned with hashes, with pip-audit, bandit and Dependabot (also for the GitHub Actions). License AGPL-3.0, with `LICENSES.md`.
+- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10 and G9, and the conversion to English code (migration 2). CI runs on GitHub; the repo is public.
 
-## Backlog per invalshoek
+## Legal framework (estimate, not legal advice)
+- For personal use, Garage falls under the **household exemption** (Art. 2(2)(c) GDPR).
+- If Daniel gives the app to others, he does not become a controller as long as no data reaches him: no telemetry, no server. Keep it that way, also with new features (see F8).
+- What does count is **privacy by design (Art. 25)**: data minimisation, security, transparency, and data that really disappears. That also applies to third-party data: the mechanic on an invoice, the previous owner on the registration card, the buyer of the sale PDF.
+- A DPIA is not needed as long as the app stays local. If synchronisation or a cloud feature ever comes, reassess this.
 
-### Privacy / AVG
-| Code | Wat | Waarom | Omvang |
+## Backlog per area
+Done is ~~struck through~~.
+
+### Privacy / GDPR
+| Code | What | Why | Size |
 |---|---|---|---|
-| **P1** | Originelen, documenten en lak-termen versleutelen met Windows DPAPI, met een migratie van de bestaande bestanden | De gegevens staan nu leesbaar op schijf, vaak in OneDrive (Documenten). Versleutelen maakt verwijderen ook effectief ("crypto-shredding"). | groot |
-| **P2** | Back-up met een wachtwoord (AES-zip of `cryptography`) | Een DPAPI-bestand is op een andere pc niet terug te zetten; de back-up moet dat wel kunnen. Nu gaat alles leesbaar naar OneDrive. | middel |
-| **P3** | Knop "Voertuig verkocht": export maken, dan originelen en documenten wissen; kiezen tussen een geanonimiseerd archief of alles weg; optioneel oude back-ups opschonen | Opslagbeperking: na verkoop zijn de originelen niet meer nodig | middel |
-| **P4** | "Alles wissen" (bijv. bij verkoop van de pc), inclusief de lijst met back-ups | Recht op vergetelheid, praktisch gemaakt | klein |
-| **P5** | Beter lakken: bij de eerste start om naam en adres vragen; extra patronen (klantnummer, geboortedatum, kenteken naar keuze); een waarschuwing zonder privé-termen | Namen worden nu alleen gevonden via eigen privé-termen | middel |
-| **P6** | Opmerkingen bij beurten staan in de verkoop-PDF: melding in het formulier, plus de keuze "opmerkingen niet tonen" bij de export | Vrije tekst kan persoonsgegevens bevatten | klein |
-| **P7** | Bewaartermijnen instelbaar: back-ups (nu 10 + 3 veiligheidskopieën), verlopen documenten na X maanden opruimen | Opslagbeperking, transparant | middel |
-| **P8** | OCR zonder tijdelijk bestand in `%TEMP%`: de afbeelding via stdin aan PowerShell geven | Bij een crash blijft nu een kopie van een factuur achter | klein |
-| **P9** | `PRAGMA secure_delete = ON` (of `VACUUM` na verwijderen) | Verwijderde rijen blijven anders in vrije pagina's van de database en gaan mee in back-ups (G1, bevinding 1) | klein |
-| **P10** | Geen oorspronkelijke bestandsnaam op de foutpagina's van de verkoop-PDF | Een bestandsnaam kan een naam bevatten (G1, bevinding 2) | klein |
+| **P1** | Encrypt originals, documents and redaction terms with Windows DPAPI, with a migration of the existing files | The data is now readable on disk, often in OneDrive (Documents). Encryption also makes deletion effective ("crypto-shredding"). | large |
+| **P2** | Backup with a password (AES zip or `cryptography`) | A DPAPI file cannot be restored on another pc; the backup must be able to. Now everything goes to OneDrive readable. | medium |
+| **P3** | "Vehicle sold" button: make the export, then erase originals and documents; choose between an anonymised archive or everything gone; optionally clean up old backups | Storage limitation: after a sale the originals are no longer needed | medium |
+| **P4** | "Erase everything" (e.g. when selling the pc), including the list of backups | Right to erasure, made practical | small |
+| **P5** | Better redaction: ask for name and address at the first start; extra patterns (customer number, date of birth, license plate optionally); a warning without private terms | Names are now only found through own private terms | medium |
+| **P6** | Service notes appear in the sale PDF: a hint in the form, plus the choice "hide notes" in the export | Free text can contain personal data | small |
+| **P7** | Configurable retention: backups (now 10 + 3 safety copies), clean up expired documents after X months | Storage limitation, transparent | medium |
+| **P8** | OCR without a temporary file in `%TEMP%`: pass the image to PowerShell through stdin | After a crash a copy of an invoice is now left behind | small |
+| ~~**P9**~~ | ~~`PRAGMA secure_delete = ON` plus a one-off `VACUUM`~~ | Deleted rows stayed in free pages of the database and went into backups | done |
+| ~~**P10**~~ | ~~No original file name on the error pages of the sale PDF~~ | A file name can contain a name | done |
 
 ### Data governance
-| Code | Wat | Waarom | Omvang |
+| Code | What | Why | Size |
 |---|---|---|---|
-| **G1** | Gegevensregister (`docs/gegevens.md`): per gegeven de bron, het doel, de gevoeligheid, de plek (db, mappen, back-up, OneDrive, log, temp) en de bewaartermijn | Verwerkingsoverzicht en basis voor P1, P7 en de privacytekst | klein |
-| **G2** | Datadictionary van alle tabellen en kolommen (betekenis, toegestane waarden, herkomst) | Onderhoudbaarheid; de koppeling tussen code en betekenis | klein |
-| **G3** | Schemaversies met `PRAGMA user_version` en genummerde migraties, in plaats van `NIEUWE_KOLOMMEN` | Voorspelbare upgrades en terugzetten van oude back-ups | middel |
-| **G4** | Herkomst per km-stand en uitgelezen veld (RDW / factuur / OCR / handmatig) en "ingevoerd op" naast "datum uitgevoerd"; in de export tonen | Een koper kan zien wat bewezen is en wat achteraf is ingevoerd | middel |
-| **G5** | Datakwaliteitsscherm: beurten zonder factuur, ongecontroleerde facturen, km-gaten, bestanden zonder database-regel (wezen) en andersom, periodiek `PRAGMA integrity_check` | Kwaliteit zichtbaar maken; wezen zijn ook een privacyrisico | middel |
-| **G6** | Echtheid van de export: SHA-256 en exportdatum op het voorblad, plus een eenvoudige controle ("klopt deze PDF?") | Vertrouwen van de koper | klein |
-| **G7** | Wijzigingslog (wat is wanneer aangepast of verwijderd), zonder inhoud van persoonsgegevens | Herleidbaarheid; ondersteunt G4 | middel |
-| **G8** | Export naar CSV/Excel van alle gegevens (zonder originelen) | Dataportabiliteit in een leesbaar formaat, naast de zip | klein |
-| **G9** | Restanten na een crash opruimen bij het starten: `.herstel-tmp\`, `.oud-*\`, `*.zip.deel` | Volledige kopieën van de gegevens blijven anders staan (G1, bevinding 3); past bij G5 | klein |
+| ~~**G1**~~ | ~~Data register~~ ([data-register.md](data-register.md)) | Record of processing and basis for P1, P7 and the privacy text | done |
+| ~~**G2**~~ | ~~Data dictionary~~ ([data-dictionary.md](data-dictionary.md)), guarded by a test | Maintainability; the link between code and meaning | done |
+| ~~**G3**~~ | ~~Schema versions with `PRAGMA user_version` and numbered migrations~~ | Predictable upgrades and restoring old backups | done |
+| **G4** | Origin per odometer reading and read field (RDW / invoice / OCR / manual) and "entered on" next to "date performed"; show in the export | A buyer can see what is proven and what was entered afterwards | medium |
+| **G5** | Data quality screen: services without an invoice, unreviewed invoices, km gaps, files without a database row (orphans) and vice versa, periodic `PRAGMA integrity_check` | Make quality visible; orphans are a privacy risk too | medium |
+| **G6** | Authenticity of the export: SHA-256 and export date on the cover page, plus a simple check ("is this PDF genuine?") | Trust of the buyer | small |
+| **G7** | Change log (what was changed or deleted when), without contents of personal data | Traceability; supports G4 | medium |
+| **G8** | Export of all data to CSV/Excel (without originals) | Data portability in a readable format, next to the zip | small |
+| ~~**G9**~~ | ~~Clean up leftovers after a crash at startup (`.herstel-tmp\`, `.oud-*\`, `*.zip.deel`), restoring an unfinished restore~~ | Full copies of the data were otherwise left behind | done |
 
-### Beveiliging
-| Code | Wat | Waarom | Omvang |
+### Security
+| Code | What | Why | Size |
 |---|---|---|---|
-| **S1** | Strikte CSP: alle `onclick`/`onsubmit` naar `static/app.js`, dan `script-src 'self'` | Ingevoegde code kan dan niet meer draaien | middel |
-| **S2** | GitHub Actions (Windows-runner): tests, pip-audit en bandit bij elke push en Dependabot-PR | Dependabot-PR's worden nu nergens getest | klein |
-| **S3** | Rooktest van de exe: `Garage.exe --zelftest` start de server zonder venster, roept de belangrijkste pagina's aan en stopt; draaien in `bouwen.bat` | De gebouwde exe wordt nu nooit automatisch getest (lazy imports, uitgesloten Pillow-delen) | klein |
-| **S4** | Een willekeurig sessietoken in een cookie, gezet via de start-URL | Andere Windows-gebruikers op dezelfde pc kunnen nu bij de server | klein |
-| **S5** | Ondertekenen van de exe (Azure Trusted Signing, ca. €10 per maand), SHA-256 bij releases, `SECURITY.md` | Echtheid voor gebruikers, geen SmartScreen-waarschuwing | middel, kost geld |
-| **S6** | PDF's openen in een apart proces met een tijdslimiet | Een kwaadaardige PDF kan de app dan niet laten hangen of crashen | middel |
+| **S1** | Strict CSP: move all `onclick`/`onsubmit` to `static/app.js`, then `script-src 'self'` | Injected code can then no longer run | medium |
+| ~~**S2**~~ | ~~GitHub Actions (Windows runner): tests, pip-audit and bandit on every push and Dependabot PR~~ | Dependabot PRs were not tested anywhere | done |
+| ~~**S3**~~ | ~~Smoke test of the exe: `Garage.exe --self-test`, in `build.bat`~~ | The built exe was never tested automatically | done |
+| **S4** | A random session token in a cookie, set through the start URL | Other Windows users on the same pc can now reach the server | small |
+| **S5** | Signing the exe (Azure Trusted Signing, about €10 per month), SHA-256 with releases, `SECURITY.md` | Authenticity for users, no SmartScreen warning | medium, costs money |
+| **S6** | Open PDFs in a separate process with a time limit | A malicious PDF can then not make the app hang or crash | medium |
 
 ### Features
-| Code | Wat | Waarde | Omvang |
+| Code | What | Value | Size |
 |---|---|---|---|
-| **F1** | Agenda-export (`.ics`) van gepland onderhoud, APK en verlopende documenten | Herinneringen in je eigen agenda, volledig offline | klein |
-| **F2** | Tankbeurten en verbruik (l/100 km, km/l), kosten per km inclusief brandstof | Een veelgevraagde functie in onderhoudsapps; een completer kostenbeeld | middel |
-| **F3** | APK-historie en gebreken uit RDW Open Data, en details van terugroepacties | Meer waarde in de verkoop-PDF, zonder extra persoonsgegevens | middel |
-| **F4** | Zoeken en filteren in de historie (type, garage, periode, bedrag) | Gemak bij lange historie | klein |
-| **F5** | Totale kosten van bezit (TCO): afschrijving, verzekering, belasting en onderhoud per jaar | Inzicht | middel |
-| **F6** | Historie van de vorige eigenaar importeren (diens verkoop-PDF als bijlage bij het voertuig) | Doorlopende historie; let op persoonsgegevens van de vorige eigenaar (lakken) | middel |
-| **F7** | Onderdelen en verbruiksmaterialen (olie, filters) met artikelnummers; lijst "nodig voor de volgende beurt" | Praktisch voor wie zelf sleutelt | middel |
-| **F8** | Melden van een nieuwe versie via GitHub Releases, alleen na toestemming | Updates zonder telemetrie | klein |
-| **F9** | Toegankelijkheid (WCAG 2.2: toetsenbord, contrast, schermlezer) | Kwaliteit, en nodig als anderen de app gaan gebruiken | middel |
+| **F1** | Calendar export (`.ics`) of planned maintenance, APK and expiring documents | Reminders in your own calendar, fully offline | small |
+| **F2** | Refuelling and consumption (l/100 km, km/l), cost per km including fuel | A popular feature in maintenance apps; a more complete cost picture | medium |
+| **F3** | APK history and defects from RDW Open Data, and details of recalls | More value in the sale PDF, without extra personal data | medium |
+| **F4** | Search and filter in the history (type, garage, period, amount) | Convenience with a long history | small |
+| **F5** | Total cost of ownership (TCO): depreciation, insurance, tax and maintenance per year | Insight | medium |
+| **F6** | Import the previous owner's history (their sale PDF as an attachment to the vehicle) | Continuous history; mind the previous owner's personal data (redaction) | medium |
+| **F7** | Parts and consumables (oil, filters) with part numbers; list "needed for the next service" | Practical for people who work on their own vehicle | medium |
+| **F8** | Notify about a new version through GitHub Releases, only with consent | Updates without telemetry | small |
+| **F9** | Accessibility (WCAG 2.2: keyboard, contrast, screen reader) | Quality, and needed if others start using the app | medium |
 
-### Codekwaliteit
-- **K1:** `main.py` (651 regels) opsplitsen in routers per onderwerp: voertuigen, beurten, facturen, beeld.
-- **K2:** `ruff` (opmaak en lint) en een typecontrole (`pyright`) in `bouwen.bat` en CI.
+### Code quality and professionalisation
+| Code | What | Why | Size |
+|---|---|---|---|
+| **K1** | Split `main.py` into routers per subject: vehicles, services, invoices, image | Overview; the file is about 500 lines | medium |
+| **K2** | `ruff` (formatting and lint) and a type check (`pyright`) in `build.bat` and CI | Catch errors earlier | small |
+| **K3** | Verify a backup after making it: open the zip and run `PRAGMA integrity_check` | The backup is the only copy of the originals; P2 builds on it | small |
+| **K4** | Build the exe and installer in CI, with SHA-256 and a GitHub artifact attestation | Provably built from this source code; the free part of S5 | medium |
+| **K5** | `CHANGELOG.md`, one place for the version number, git tags | Traceable releases | small |
+| **K6** | Short threat model and recorded design decisions (e.g. DPAPI or password) | Choices in P1/P2 and S4 can be explained | small |
+| **K7** | Rule and test: `app.log` contains no invoice contents or redaction terms | Otherwise log files leak personal data | small |
+| **K8** | License check (e.g. `pip-licenses`) and SBOM in CI | `LICENSES.md` does not go stale unnoticed; AGPL obligations | small |
+| **K9** | Coverage (`pytest-cov`) | See which paths have no test, especially in restoring and migrating | small |
 
-## Voorgestelde volgorde
-1. **Fundament:** S2, S3, G1, G2, G3. Eerst het vangnet (CI en een rooktest van de exe) en de documentatie van wat er is; G3 is nodig voordat P1 het schema verandert. *Gebouwd, nog niet gecommit; CI nog niet op GitHub gedraaid.*
-2. **Grootste privacywinst:** P1 + P2 (samen ontwerpen, inclusief migratie en terugzetten), daarna P3, P4 en P6. *P9, P10 en G9 zijn al gebouwd (nog niet gecommit).*
-3. **Vertrouwen voor de koper:** G4, G6, G7, en daarbij F3.
-4. **Afronden:** S1, P5, P7, P8, G5, G8, S4.
-5. **Features naar keuze:** F1, F2 en F4 zijn snel en waardevol; de rest op aanvraag.
+## Suggested order
+1. ~~**Foundation:** S2, S3, G1, G2, G3.~~ Done, together with P9, P10, G9 and the conversion to English code.
+2. **Biggest privacy gain:** K3, then P1 + P2 (designed together, including migration and restore), then P3, P4 and P6.
+3. **Trust for the buyer:** G4, G6, G7, and with it F3.
+4. **Finishing:** S1, P5, P7, P8, G5, G8, S4, K1, K2.
+5. **Professionalisation, spread out:** K4 to K9.
+6. **Features by choice:** F1, F2 and F4 are quick and valuable; the rest on request.
 
-## Open beslissingen voor Daniel
-1. Gaat de app naar anderen, en wordt de GitHub-repo dan openbaar? Dat bepaalt de AGPL, S5, F8 en F9.
-2. P1: DPAPI (geen wachtwoord, gekoppeld aan het Windows-account) of een eigen wachtwoord bij het opstarten?
-3. P3: na verkoop alles wissen of een geanonimiseerd archief bewaren?
-4. Welke features (F1 t/m F9) hebben de voorkeur?
-5. Blijft Python 3.15 de basis? Het ecosysteem loopt nog achter (zie pyyaml), maar `lazy import` hangt ervan af.
+## Open decisions for Daniel
+1. ~~Will the GitHub repo be public?~~ Yes, the repo is public. Still open: will the app be actively given to others? That decides S5, F8 and F9.
+2. P1: DPAPI (no password, tied to the Windows account) or an own password at startup?
+3. P3: after a sale erase everything or keep an anonymised archive?
+4. Which features (F1 to F9) are preferred?
+5. Does Python 3.15 remain the base? The ecosystem is still catching up (see pyyaml, Dependabot), but `lazy import` depends on it.
+6. Which language for commit messages: English (fits the code) or Dutch?

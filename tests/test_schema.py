@@ -1,13 +1,15 @@
-"""Schemaversies en migraties (PRAGMA user_version)."""
+"""Schema versions and migrations (PRAGMA user_version)."""
+import json
 import sqlite3
 import zipfile
 
 import pytest
 
 from app import backup, db
-from tests.test_app import client, voeg_voertuig_toe  # noqa: F401
+from tests.test_app import add_vehicle, client  # noqa: F401
 
-# Oude database van vóór de migraties: zonder user_version, zonder later toegevoegde kolommen en tabellen
+# Old database from before migrations: no user_version, no columns and tables that were added later.
+# Names are Dutch, as they were then.
 SCHEMA_1_2 = """
 CREATE TABLE voertuig (id INTEGER PRIMARY KEY, kenteken TEXT NOT NULL, voertuigsoort TEXT NOT NULL,
     merk TEXT, model TEXT, datum_eerste_toelating TEXT, kleur TEXT, cilinderinhoud INTEGER, bijnaam TEXT);
@@ -24,104 +26,138 @@ INSERT INTO factuur (beurt_id, pad, originele_naam, mime_type) VALUES (1, 'factu
 
 
 @pytest.fixture
-def leeg(tmp_path, monkeypatch):
+def empty(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "DATA_DIR", tmp_path)
     return tmp_path / "onderhoud.db"
 
 
-def kolommen(tabel):
+def columns(table):
     with db.connect() as conn:
-        return {r["name"] for r in conn.execute(f"PRAGMA table_info({tabel})")}
+        return {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
 
 
-def test_nieuwe_database_krijgt_laatste_versie(leeg):
+def old_database(path, extra_sql=""):
+    old = sqlite3.connect(path)
+    old.executescript(SCHEMA_1_2 + extra_sql)
+    old.close()
+
+
+def test_new_database_gets_latest_version(empty):
     db.init()
     with db.connect() as conn:
-        assert db.schemaversie(conn) == db.SCHEMAVERSIE
-    for tabel, extra in db.KOLOMMEN_1.items():
-        assert set(extra) <= kolommen(tabel)
+        assert db.schema_version(conn) == db.SCHEMA_VERSION
+    for old_table, (table, renamed) in db.RENAMES_2.items():
+        assert set(renamed.values()) <= columns(table)
 
 
-def test_database_van_voor_de_migraties_wordt_bijgewerkt(leeg):
-    oud = sqlite3.connect(leeg)
-    oud.executescript(SCHEMA_1_2)
-    oud.close()
+def test_database_from_before_migrations_is_updated(empty):
+    old_database(empty)
     db.init()
-    db.init()  # tweede keer: niets meer te doen
+    db.init()  # second time: nothing left to do
     with db.connect() as conn:
-        assert db.schemaversie(conn) == db.SCHEMAVERSIE
-        assert conn.execute("SELECT kilometerstand FROM beurt").fetchone()[0] == 12000
-        assert conn.execute("SELECT gecontroleerd, origineel_pad FROM factuur").fetchone()[:] == (0, None)
-        assert conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'stalling'").fetchone()
+        assert db.schema_version(conn) == db.SCHEMA_VERSION
+        assert conn.execute("SELECT odometer_km FROM service").fetchone()[0] == 12000
+        assert conn.execute("SELECT reviewed, original_path FROM invoice").fetchone()[:] == (0, None)
+        assert conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'storage_period'").fetchone()
 
 
-def test_mislukte_migratie_wordt_teruggedraaid(leeg, monkeypatch):
+def test_migration_2_converts_names_and_internal_values(empty):
+    old_database(empty, """
+        CREATE TABLE instelling (sleutel TEXT PRIMARY KEY, waarde TEXT);
+        INSERT INTO instelling VALUES ('thema', 'donker'), ('herinneringen', 'uit'), ('prive_termen', 'aan'),
+                                      ('melding_laatst', '{"datum": "2026-01-01"}'), ('backup_map', 'D:\\Back-ups');
+        UPDATE voertuig SET bijnaam = 'De Groene';
+        ALTER TABLE voertuig ADD COLUMN beeld_type TEXT;
+        ALTER TABLE voertuig ADD COLUMN rdw_json TEXT;
+        UPDATE voertuig SET beeld_type = 'foto', rdw_json = '{"apk_vervaldatum": "2027-01-01", "brandstof": "Benzine"}';
+        ALTER TABLE factuur ADD COLUMN boxen TEXT;
+        UPDATE factuur SET boxen = '[{"pagina": 0, "x0": 0.1, "y0": 0.1, "x1": 0.2, "y1": 0.2}]';
+    """)
+    db.init()
+    with db.connect() as conn:
+        settings = dict(conn.execute("SELECT key, value FROM setting").fetchall())
+        v = conn.execute("SELECT * FROM vehicle").fetchone()
+        redactions = json.loads(conn.execute("SELECT redactions FROM invoice").fetchone()[0])
+        fk = conn.execute("SELECT * FROM pragma_foreign_key_list('service')").fetchone()
+    assert settings["theme"] == "dark" and settings["reminders"] == "off" and settings["backup_folder"] == "D:\\Back-ups"
+    assert settings["private_terms"] == "aan"  # the user's own text is never 'translated'
+    assert "last_notification" not in settings  # only limits repeats; rebuilds itself
+    assert v["nickname"] == "De Groene" and v["image_type"] == "photo" and v["vehicle_type"] == "Motorfiets"
+    assert json.loads(v["rdw_json"]) == {"apk_expiry_date": "2027-01-01", "fuel": "Benzine"}
+    assert redactions == [{"page": 0, "x0": 0.1, "y0": 0.1, "x1": 0.2, "y1": 0.2}]
+    assert fk["table"] == "vehicle"  # foreign keys follow the renamed table
+
+
+def test_failed_migration_is_rolled_back(empty, monkeypatch):
     db.init()
 
-    def kapot(conn):
+    def broken(conn):
         conn.execute("CREATE TABLE half (id INTEGER)")
-        conn.execute("ALTER TABLE voertuig ADD COLUMN half TEXT")
-        raise RuntimeError("halverwege mis")
+        conn.execute("ALTER TABLE vehicle ADD COLUMN half TEXT")
+        raise RuntimeError("halfway wrong")
 
-    monkeypatch.setattr(db, "MIGRATIES", [*db.MIGRATIES, kapot])
-    monkeypatch.setattr(db, "SCHEMAVERSIE", len(db.MIGRATIES))
+    monkeypatch.setattr(db, "MIGRATIONS", [*db.MIGRATIONS, broken])
+    monkeypatch.setattr(db, "SCHEMA_VERSION", len(db.MIGRATIONS))
     with pytest.raises(RuntimeError):
         db.init()
     with db.connect() as conn:
-        assert db.schemaversie(conn) == len(db.MIGRATIES) - 1
+        assert db.schema_version(conn) == len(db.MIGRATIONS) - 1
         assert not conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'half'").fetchone()
-    assert "half" not in kolommen("voertuig")
+    assert "half" not in columns("vehicle")
 
 
-def test_gegevens_van_nieuwere_versie_worden_niet_aangeraakt(leeg):
+def test_data_of_a_newer_version_is_not_touched(empty):
     db.init()
     with db.connect() as conn:
-        conn.execute(f"PRAGMA user_version = {db.SCHEMAVERSIE + 1}")
-    with pytest.raises(db.SchemaFout, match="nieuwere versie"):
+        conn.execute(f"PRAGMA user_version = {db.SCHEMA_VERSION + 1}")
+    with pytest.raises(db.SchemaError, match="nieuwere versie"):
         db.init()
 
 
-def test_back_up_van_nieuwere_versie_geweigerd(client, tmp_path):
-    voeg_voertuig_toe(client)
-    zip_pad = backup.maak()
-    with zipfile.ZipFile(zip_pad) as z:
-        z.extract("onderhoud.db", tmp_path / "uit")
-    nieuw = sqlite3.connect(tmp_path / "uit" / "onderhoud.db")
-    nieuw.execute(f"PRAGMA user_version = {db.SCHEMAVERSIE + 1}")
-    nieuw.close()
-    with zipfile.ZipFile(tmp_path / "nieuwer.zip", "w") as z:
-        z.write(tmp_path / "uit" / "onderhoud.db", "onderhoud.db")
-    with pytest.raises(backup.BackupFout, match="nieuwere versie"):
-        backup.herstel(tmp_path / "nieuwer.zip")
+def test_backup_of_a_newer_version_refused(client, tmp_path):
+    add_vehicle(client)
+    zip_path = backup.create()
+    with zipfile.ZipFile(zip_path) as z:
+        z.extract("onderhoud.db", tmp_path / "out")
+    newer = sqlite3.connect(tmp_path / "out" / "onderhoud.db")
+    newer.execute(f"PRAGMA user_version = {db.SCHEMA_VERSION + 1}")
+    newer.close()
+    with zipfile.ZipFile(tmp_path / "newer.zip", "w") as z:
+        z.write(tmp_path / "out" / "onderhoud.db", "onderhoud.db")
+    with pytest.raises(backup.BackupError, match="nieuwere versie"):
+        backup.restore(tmp_path / "newer.zip")
 
 
-def test_mislukte_migratie_bij_terugzetten_laat_alles_zoals_het_was(client, tmp_path, monkeypatch):
-    vid = voeg_voertuig_toe(client, kenteken="ZZ-99-ZZ")
-    oud = sqlite3.connect(tmp_path / "onderhoud.db")
-    oud.executescript(SCHEMA_1_2)
-    oud.close()
-    with zipfile.ZipFile(tmp_path / "oud.zip", "w") as z:
+def test_failed_migration_during_restore_leaves_everything_as_it_was(client, tmp_path, monkeypatch):
+    vid = add_vehicle(client, plate="ZZ-99-ZZ")
+    old_database(tmp_path / "onderhoud.db")
+    with zipfile.ZipFile(tmp_path / "old.zip", "w") as z:
         z.write(tmp_path / "onderhoud.db", "onderhoud.db")
 
-    def kapot(conn):
-        raise RuntimeError("migratie mislukt")
+    real_migrate = db.migrate
+    calls = []
 
-    monkeypatch.setattr(db, "MIGRATIES", [kapot])
-    with pytest.raises(backup.BackupFout, match="oude gegevens zijn teruggezet"):
-        backup.herstel(tmp_path / "oud.zip")
+    def migrate_fails_the_second_time(conn):  # 1st: checking the backup copy; 2nd: the live database
+        calls.append(1)
+        if len(calls) == 2:
+            raise RuntimeError("migration failed")
+        return real_migrate(conn)
+
+    monkeypatch.setattr(db, "migrate", migrate_fails_the_second_time)
+    with pytest.raises(backup.BackupError, match="oude gegevens zijn teruggezet"):
+        backup.restore(tmp_path / "old.zip")
+    monkeypatch.setattr(db, "migrate", real_migrate)
     with db.connect() as conn:
-        assert conn.execute("SELECT kenteken FROM voertuig WHERE id = ?", (vid,)).fetchone()[0] == "ZZ99ZZ"
-        assert db.schemaversie(conn) == db.SCHEMAVERSIE
+        assert conn.execute("SELECT license_plate FROM vehicle WHERE id = ?", (vid,)).fetchone()[0] == "ZZ99ZZ"
+        assert db.schema_version(conn) == db.SCHEMA_VERSION
 
 
-def test_terugzetten_van_oude_back_up_migreert(client, tmp_path):
-    oud = sqlite3.connect(tmp_path / "onderhoud.db")
-    oud.executescript(SCHEMA_1_2)
-    oud.close()
-    with zipfile.ZipFile(tmp_path / "oud.zip", "w") as z:
+def test_restoring_an_old_backup_migrates(client, tmp_path):
+    old_database(tmp_path / "onderhoud.db")
+    with zipfile.ZipFile(tmp_path / "old.zip", "w") as z:
         z.write(tmp_path / "onderhoud.db", "onderhoud.db")
-    backup.herstel(tmp_path / "oud.zip")
+    backup.restore(tmp_path / "old.zip")
     with db.connect() as conn:
-        assert db.schemaversie(conn) == db.SCHEMAVERSIE
-        assert conn.execute("SELECT merk FROM voertuig").fetchone()[0] == "Honda"
-    assert "rdw_json" in kolommen("voertuig")
+        assert db.schema_version(conn) == db.SCHEMA_VERSION
+        assert conn.execute("SELECT make FROM vehicle").fetchone()[0] == "Honda"
+    assert "rdw_json" in columns("vehicle")

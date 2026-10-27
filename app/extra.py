@@ -1,4 +1,4 @@
-"""Uitbreidingen: back-up, km-registraties, documenten, specificaties, stalling, kostenoverzicht en weergave."""
+"""Extensions: backup, odometer readings, documents, specs, storage, cost overview and theme."""
 import json
 import shutil
 import tempfile
@@ -10,461 +10,472 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from . import backup, db, planning
-from .web import TOEGESTAAN, _of_400, getal, haal, lees_uploads, mime_voor, render, terug, verwijder_bestanden
+from .web import ALLOWED, delete_files, fetch, mime_for, or_400, parse_int, read_uploads, redirect, render
 
 router = APIRouter()
 
-THEMAS = {"licht": "Licht", "donker": "Donker", "systeem": "Zoals Windows"}
-DOCUMENTSOORTEN = ["Kentekenbewijs / kentekencard", "Verzekeringspolis", "Aankoopfactuur", "Garantiebewijs",
-                   "Instructieboekje / handleiding", "Keuringsrapport", "Overig"]
-SPECS_MOTOR = ["Motorolie", "Olie-inhoud", "Oliefilter", "Luchtfilter", "Bougies", "Bandenmaat voor", "Bandenmaat achter",
-               "Bandenspanning voor", "Bandenspanning achter", "Ketting", "Tandwielen (voor/achter)", "Remblokken voor",
-               "Remblokken achter", "Accu", "Remvloeistof", "Koelvloeistof"]
-SPECS_AUTO = ["Motorolie", "Olie-inhoud", "Oliefilter", "Luchtfilter", "Interieurfilter", "Bougies", "Bandenmaat",
-              "Bandenspanning voor", "Bandenspanning achter", "Ruitenwissers", "Accu", "Remvloeistof", "Koelvloeistof"]
-SPEC_VOORBEELD = {"Motorolie": "bijv. 10W-40 (Motul 7100)", "Olie-inhoud": "bijv. 3,0 L met filter",
-                  "Oliefilter": "bijv. HF303", "Bandenmaat voor": "bijv. 120/70 ZR17", "Bandenmaat achter": "bijv. 180/55 ZR17",
-                  "Bandenspanning voor": "bijv. 2,5 bar", "Bandenspanning achter": "bijv. 2,9 bar", "Ketting": "bijv. DID 520VX3, 112 schakels",
-                  "Accu": "bijv. YTX12-BS", "Bougies": "bijv. NGK CR9EK", "Bandenmaat": "bijv. 205/55 R16"}
-STALLEN = ["Tank volgooien (eventueel met brandstofstabilisator)", "Wassen en goed laten drogen",
-           "Ketting reinigen en smeren", "Bandenspanning iets verhogen (ca. 0,5 bar)", "Accu loskoppelen of aan een druppellader",
-           "Droog en vorstvrij wegzetten, eventueel op een paddockstand", "Verzekering: eventueel schorsen of stallingskorting vragen"]
-OPHALEN = ["Accu laden en aansluiten", "Bandenspanning terug op normale waarde", "Olieniveau en lekkage controleren",
-           "Remmen en remvloeistof controleren", "Ketting spannen en smeren", "Verlichting en richtingaanwijzers testen",
-           "Rustig de eerste kilometers rijden (banden en remmen moeten op temperatuur komen)"]
+# Values and labels below are shown in the app, so they are Dutch.
+THEMES = {"light": "Licht", "dark": "Donker", "system": "Zoals Windows"}
+DOCUMENT_KINDS = ["Kentekenbewijs / kentekencard", "Verzekeringspolis", "Aankoopfactuur", "Garantiebewijs",
+                  "Instructieboekje / handleiding", "Keuringsrapport", "Overig"]
+SPECS_MOTORCYCLE = ["Motorolie", "Olie-inhoud", "Oliefilter", "Luchtfilter", "Bougies", "Bandenmaat voor",
+                    "Bandenmaat achter", "Bandenspanning voor", "Bandenspanning achter", "Ketting",
+                    "Tandwielen (voor/achter)", "Remblokken voor", "Remblokken achter", "Accu", "Remvloeistof",
+                    "Koelvloeistof"]
+SPECS_CAR = ["Motorolie", "Olie-inhoud", "Oliefilter", "Luchtfilter", "Interieurfilter", "Bougies", "Bandenmaat",
+             "Bandenspanning voor", "Bandenspanning achter", "Ruitenwissers", "Accu", "Remvloeistof", "Koelvloeistof"]
+SPEC_EXAMPLES = {"Motorolie": "bijv. 10W-40 (Motul 7100)", "Olie-inhoud": "bijv. 3,0 L met filter",
+                 "Oliefilter": "bijv. HF303", "Bandenmaat voor": "bijv. 120/70 ZR17", "Bandenmaat achter": "bijv. 180/55 ZR17",
+                 "Bandenspanning voor": "bijv. 2,5 bar", "Bandenspanning achter": "bijv. 2,9 bar",
+                 "Ketting": "bijv. DID 520VX3, 112 schakels", "Accu": "bijv. YTX12-BS", "Bougies": "bijv. NGK CR9EK",
+                 "Bandenmaat": "bijv. 205/55 R16"}
+STORE_CHECKLIST = ["Tank volgooien (eventueel met brandstofstabilisator)", "Wassen en goed laten drogen",
+                   "Ketting reinigen en smeren", "Bandenspanning iets verhogen (ca. 0,5 bar)",
+                   "Accu loskoppelen of aan een druppellader", "Droog en vorstvrij wegzetten, eventueel op een paddockstand",
+                   "Verzekering: eventueel schorsen of stallingskorting vragen"]
+PICKUP_CHECKLIST = ["Accu laden en aansluiten", "Bandenspanning terug op normale waarde",
+                    "Olieniveau en lekkage controleren", "Remmen en remvloeistof controleren",
+                    "Ketting spannen en smeren", "Verlichting en richtingaanwijzers testen",
+                    "Rustig de eerste kilometers rijden (banden en remmen moeten op temperatuur komen)"]
 
 
-def specs_voor(soort: str) -> list[str]:
-    return SPECS_MOTOR if soort in ("Motorfiets", "Bromfiets") else SPECS_AUTO if soort in ("Personenauto", "Bedrijfsauto") else []
+def specs_for(vehicle_type: str) -> list[str]:
+    return (SPECS_MOTORCYCLE if vehicle_type in ("Motorfiets", "Bromfiets")
+            else SPECS_CAR if vehicle_type in ("Personenauto", "Bedrijfsauto") else [])
 
 
-def _datum(waarde: str) -> str:
+def _date(value: str) -> str:
     try:
-        return date.fromisoformat(waarde).isoformat()
+        return date.fromisoformat(value).isoformat()
     except (TypeError, ValueError):
         raise HTTPException(400, "Vul een geldige datum in.")
 
 
-# ---------- weergave (licht / donker / systeem) ----------
+# ---------- theme (light / dark / system) ----------
 
-@router.post("/weergave")
-def weergave(thema: str = Form(...)):
-    if thema not in THEMAS:
+@router.post("/theme")
+def set_theme(theme: str = Form(...)):
+    if theme not in THEMES:
         raise HTTPException(400, "Onbekende weergave")
     with db.connect() as conn:
-        db.zet_instelling(conn, "thema", thema)
-    return {"thema": thema}
+        db.set_setting(conn, "theme", theme)
+    return {"theme": theme}
 
 
-# ---------- km-stand noteren ----------
+# ---------- odometer readings ----------
 
-def km_controle(conn, vid: int, datum: str, km: int, behalve_beurt: int | None = None) -> str | None:
-    """Een km-stand moet passen tussen eerdere en latere registraties (tellers lopen niet terug)."""
-    for r in db.kmverloop(conn, vid):
-        if behalve_beurt is not None and r["bron"] == "beurt" and r["id"] == behalve_beurt:
+SOURCE_TEXT = {"service": "bij een onderhoudsbeurt", "reading": "als losse km-stand", "storage_start": "bij het stallen",
+               "storage_end": "bij het ophalen uit de stalling"}
+
+
+def km_check(conn, vid: int, day: str, km: int, except_service: int | None = None) -> str | None:
+    """A reading must fit between earlier and later readings (odometers don't run backwards)."""
+    for r in db.odometer_history(conn, vid):
+        if except_service is not None and r["source"] == "service" and r["id"] == except_service:
             continue
-        bron = {"beurt": "bij een onderhoudsbeurt", "notitie": "als losse km-stand", "stalling in": "bij het stallen",
-                "stalling uit": "bij het ophalen uit de stalling"}.get(r["bron"], "")
-        datum_nl = date.fromisoformat(r["datum"]).strftime("%d-%m-%Y")
-        if r["datum"] <= datum and r["kilometerstand"] > km:
-            return (f"{km:,} km is lager dan de {r['kilometerstand']:,} km die op {datum_nl} al {bron} is genoteerd. "
+        source = SOURCE_TEXT.get(r["source"], "")
+        day_nl = date.fromisoformat(r["date"]).strftime("%d-%m-%Y")
+        if r["date"] <= day and r["odometer_km"] > km:
+            return (f"{km:,} km is lager dan de {r['odometer_km']:,} km die op {day_nl} al {source} is genoteerd. "
                     "Klopt die eerdere stand niet? Pas hem dan eerst aan (Kosten & km of Stalling).").replace(",", ".")
-        if r["datum"] > datum and r["kilometerstand"] < km:
-            return (f"{km:,} km is hoger dan de {r['kilometerstand']:,} km die later, op {datum_nl}, {bron} is genoteerd."
+        if r["date"] > day and r["odometer_km"] < km:
+            return (f"{km:,} km is hoger dan de {r['odometer_km']:,} km die later, op {day_nl}, {source} is genoteerd."
                     ).replace(",", ".")
     return None
 
 
-@router.post("/voertuigen/{vid}/km")
-def km_noteren(vid: int, kilometerstand: str = Form(...), datum: str = Form(""), opmerking: str = Form("")):
-    datum = _datum(datum or date.today().isoformat())
-    km = _of_400(getal, kilometerstand)
+@router.post("/vehicles/{vid}/odometer")
+def add_reading(vid: int, odometer_km: str = Form(...), date_: str = Form("", alias="date"), note: str = Form("")):
+    day = _date(date_ or date.today().isoformat())
+    km = or_400(parse_int, odometer_km)
     if km is None:
         raise HTTPException(400, "Vul een kilometerstand in.")
-    if datum > date.today().isoformat():
+    if day > date.today().isoformat():
         raise HTTPException(400, "De datum ligt in de toekomst.")
     with db.connect() as conn:
-        haal(conn, "voertuig", vid)
-        if fout := km_controle(conn, vid, datum, km):
-            raise HTTPException(400, fout)
-        conn.execute("INSERT INTO km_stand (voertuig_id, datum, kilometerstand, opmerking) VALUES (?,?,?,?)",
-                     (vid, datum, km, opmerking.strip() or None))
-    return terug(f"/voertuigen/{vid}?km=1")
+        fetch(conn, "vehicle", vid)
+        if error := km_check(conn, vid, day, km):
+            raise HTTPException(400, error)
+        conn.execute("INSERT INTO odometer_reading (vehicle_id, date, odometer_km, note) VALUES (?,?,?,?)",
+                     (vid, day, km, note.strip() or None))
+    return redirect(f"/vehicles/{vid}?km=1")
 
 
-@router.post("/km/{kid}/verwijderen")
-def km_verwijderen(kid: int):
+@router.post("/odometer/{rid}/delete")
+def delete_reading(rid: int):
     with db.connect() as conn:
-        vid = haal(conn, "km_stand", kid)["voertuig_id"]
-        conn.execute("DELETE FROM km_stand WHERE id = ?", (kid,))
-    return terug(f"/voertuigen/{vid}/kosten#km")
+        vid = fetch(conn, "odometer_reading", rid)["vehicle_id"]
+        conn.execute("DELETE FROM odometer_reading WHERE id = ?", (rid,))
+    return redirect(f"/vehicles/{vid}/costs#odometer")
 
 
-# ---------- kosten- en km-overzicht ----------
+# ---------- cost and km overview ----------
 
-def _grafiek_kosten(per_jaar: dict[int, float]) -> dict:
-    jaren = sorted(per_jaar)
-    hoogste = max(per_jaar.values(), default=0) or 1
-    return {"staven": [{"jaar": j, "bedrag": per_jaar[j], "hoogte": per_jaar[j] / hoogste} for j in jaren],
-            "max": hoogste}
+def _cost_chart(per_year: dict[int, float]) -> dict:
+    years = sorted(per_year)
+    highest = max(per_year.values(), default=0) or 1
+    return {"bars": [{"year": y, "amount": per_year[y], "height": per_year[y] / highest} for y in years],
+            "max": highest}
 
 
-def _grafiek_km(verloop: list[dict]) -> dict | None:
-    punten = [(date.fromisoformat(r["datum"]), r["kilometerstand"]) for r in verloop]
-    if len(punten) < 2:
+def _km_chart(history: list[dict]) -> dict | None:
+    points = [(date.fromisoformat(r["date"]), r["odometer_km"]) for r in history]
+    if len(points) < 2:
         return None
-    t0, t1 = punten[0][0].toordinal(), max(punten[-1][0].toordinal(), punten[0][0].toordinal() + 1)
-    k0, k1 = min(p[1] for p in punten), max(p[1] for p in punten)
+    t0, t1 = points[0][0].toordinal(), max(points[-1][0].toordinal(), points[0][0].toordinal() + 1)
+    k0, k1 = min(p[1] for p in points), max(p[1] for p in points)
     k1 = k1 if k1 > k0 else k0 + 1
-    return {"punten": [{"x": (d.toordinal() - t0) / (t1 - t0), "y": (k - k0) / (k1 - k0), "datum": d, "km": k}
-                       for d, k in punten], "min": k0, "max": k1, "van": punten[0][0], "tot": punten[-1][0]}
+    return {"points": [{"x": (d.toordinal() - t0) / (t1 - t0), "y": (k - k0) / (k1 - k0), "date": d, "km": k}
+                       for d, k in points], "min": k0, "max": k1, "start": points[0][0], "end": points[-1][0]}
 
 
-@router.get("/voertuigen/{vid}/kosten")
-def kosten(request: Request, vid: int):
+@router.get("/vehicles/{vid}/costs")
+def costs(request: Request, vid: int):
     with db.connect() as conn:
-        v = haal(conn, "voertuig", vid)
-        beurten = db.beurten(conn, vid)
-        verloop = db.kmverloop(conn, vid)
-        notities = conn.execute("SELECT * FROM km_stand WHERE voertuig_id = ? ORDER BY datum DESC", (vid,)).fetchall()
-    met_kosten = [b for b in beurten if b["kosten"]]
-    per_jaar: dict[int, float] = {}
-    per_soort: dict[str, float] = {}
-    for b in met_kosten:
-        per_jaar[int(b["datum"][:4])] = per_jaar.get(int(b["datum"][:4]), 0) + b["kosten"]
-        # een beurt met meerdere werkzaamheden is niet eerlijk te splitsen: die telt als 'gecombineerd'
-        soort = b["types"][0]["naam"] if len(b["types"]) == 1 else "Beurten met meerdere klussen"
-        per_soort[soort] = per_soort.get(soort, 0) + b["kosten"]
-    totaal = sum(b["kosten"] for b in met_kosten)
-    gereden = (verloop[-1]["kilometerstand"] - verloop[0]["kilometerstand"]) if len(verloop) >= 2 else 0
-    hoogste_soort = max(per_soort.values(), default=1)
-    return render(request, "kosten.html", v=v, totaal=totaal, aantal=len(met_kosten),
-                  per_km=totaal / gereden if gereden > 0 and totaal else None, gereden=gereden,
-                  per_jaar=_grafiek_kosten(per_jaar),
-                  per_soort=sorted(((s, b, b / hoogste_soort) for s, b in per_soort.items()), key=lambda x: -x[1]),
-                  km=_grafiek_km(verloop), verloop=list(reversed(verloop)), notities=notities)
+        v = fetch(conn, "vehicle", vid)
+        services = db.services(conn, vid)
+        history = db.odometer_history(conn, vid)
+        readings = conn.execute("SELECT * FROM odometer_reading WHERE vehicle_id = ? ORDER BY date DESC", (vid,)).fetchall()
+    with_cost = [s for s in services if s["cost"]]
+    per_year: dict[int, float] = {}
+    per_kind: dict[str, float] = {}
+    for s in with_cost:
+        per_year[int(s["date"][:4])] = per_year.get(int(s["date"][:4]), 0) + s["cost"]
+        # a service with several jobs cannot be split fairly: it counts as 'combined'
+        kind = s["types"][0]["name"] if len(s["types"]) == 1 else "Beurten met meerdere klussen"
+        per_kind[kind] = per_kind.get(kind, 0) + s["cost"]
+    total = sum(s["cost"] for s in with_cost)
+    driven = (history[-1]["odometer_km"] - history[0]["odometer_km"]) if len(history) >= 2 else 0
+    highest_kind = max(per_kind.values(), default=1)
+    return render(request, "costs.html", v=v, total=total, count=len(with_cost),
+                  per_km=total / driven if driven > 0 and total else None, driven=driven,
+                  per_year=_cost_chart(per_year),
+                  per_kind=sorted(((k, a, a / highest_kind) for k, a in per_kind.items()), key=lambda x: -x[1]),
+                  km=_km_chart(history), history=list(reversed(history)), readings=readings)
 
 
-# ---------- documenten ----------
+# ---------- documents ----------
 
-@router.get("/voertuigen/{vid}/documenten")
-def documenten(request: Request, vid: int):
+@router.get("/vehicles/{vid}/documents")
+def documents(request: Request, vid: int):
     with db.connect() as conn:
-        v = haal(conn, "voertuig", vid)
-        docs = conn.execute("SELECT * FROM document WHERE voertuig_id = ? ORDER BY soort, toegevoegd DESC", (vid,)).fetchall()
-    return render(request, "documenten.html", v=v, docs=docs, soorten=DOCUMENTSOORTEN, vandaag=date.today().isoformat())
+        v = fetch(conn, "vehicle", vid)
+        docs = conn.execute("SELECT * FROM document WHERE vehicle_id = ? ORDER BY kind, added_on DESC", (vid,)).fetchall()
+    return render(request, "documents.html", v=v, docs=docs, kinds=DOCUMENT_KINDS, today=date.today().isoformat())
 
 
-@router.post("/voertuigen/{vid}/documenten")
-async def document_toevoegen(vid: int, soort: str = Form(...), titel: str = Form(""), vervaldatum: str = Form(""),
-                             bestand: UploadFile = File(...)):
-    if soort not in DOCUMENTSOORTEN:
+@router.post("/vehicles/{vid}/documents")
+async def add_document(vid: int, kind: str = Form(...), title: str = Form(""), expiry_date: str = Form(""),
+                       file: UploadFile = File(...)):
+    if kind not in DOCUMENT_KINDS:
         raise HTTPException(400, "Kies een soort document.")
-    vervaldatum = _datum(vervaldatum) if vervaldatum else None
+    expiry_date = _date(expiry_date) if expiry_date else None
     try:
-        uploads = await lees_uploads([bestand])
+        uploads = await read_uploads([file])
     except ValueError as e:
         raise HTTPException(400, str(e))
     if not uploads:
         raise HTTPException(400, "Kies een bestand.")
-    naam, ext, inhoud = uploads[0]
+    name, ext, content = uploads[0]
     with db.connect() as conn:
-        haal(conn, "voertuig", vid)
-        map_ = db.DATA_DIR / "documenten" / str(vid)
-        map_.mkdir(parents=True, exist_ok=True)
-        pad = map_ / f"{uuid.uuid4().hex}{ext}"
-        pad.write_bytes(inhoud)
+        fetch(conn, "vehicle", vid)
+        folder = db.DATA_DIR / "documenten" / str(vid)
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"{uuid.uuid4().hex}{ext}"
+        path.write_bytes(content)
         try:
-            conn.execute("INSERT INTO document (voertuig_id, soort, titel, pad, originele_naam, mime_type, vervaldatum, toegevoegd)"
-                         " VALUES (?,?,?,?,?,?,?,?)", (vid, soort, titel.strip() or None, pad.relative_to(db.DATA_DIR).as_posix(),
-                                                       naam, TOEGESTAAN[ext][0], vervaldatum, date.today().isoformat()))
+            conn.execute("INSERT INTO document (vehicle_id, kind, title, path, original_filename, mime_type, expiry_date,"
+                         " added_on) VALUES (?,?,?,?,?,?,?,?)",
+                         (vid, kind, title.strip() or None, path.relative_to(db.DATA_DIR).as_posix(),
+                          name, ALLOWED[ext][0], expiry_date, date.today().isoformat()))
         except Exception:
-            pad.unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
             raise
-    return terug(f"/voertuigen/{vid}/documenten")
+    return redirect(f"/vehicles/{vid}/documents")
 
 
-@router.get("/documenten/{did}")
-def document_openen(did: int):
+@router.get("/documents/{did}")
+def open_document(did: int):
     with db.connect() as conn:
-        d = haal(conn, "document", did)
+        d = fetch(conn, "document", did)
     try:
-        pad = db.bestand(d["pad"])
+        path = db.data_file(d["path"])
     except ValueError:
         raise HTTPException(404, "Bestand niet gevonden")
-    if not pad.is_file():
+    if not path.is_file():
         raise HTTPException(404, "Bestand ontbreekt op schijf")
-    return FileResponse(pad, media_type=mime_voor(pad), filename=d["originele_naam"], content_disposition_type="inline")
+    return FileResponse(path, media_type=mime_for(path), filename=d["original_filename"], content_disposition_type="inline")
 
 
-@router.post("/documenten/{did}/verwijderen")
-def document_verwijderen(did: int):
+@router.post("/documents/{did}/delete")
+def delete_document(did: int):
     with db.connect() as conn:
-        d = haal(conn, "document", did)
+        d = fetch(conn, "document", did)
         conn.execute("DELETE FROM document WHERE id = ?", (did,))
-    verwijder_bestanden([d["pad"]])
-    return terug(f"/voertuigen/{d['voertuig_id']}/documenten")
+    delete_files([d["path"]])
+    return redirect(f"/vehicles/{d['vehicle_id']}/documents")
 
 
-@router.post("/documenten/{did}/vervaldatum")
-def document_vervaldatum(did: int, vervaldatum: str = Form("")):
+@router.post("/documents/{did}/expiry")
+def set_document_expiry(did: int, expiry_date: str = Form("")):
     with db.connect() as conn:
-        d = haal(conn, "document", did)
-        conn.execute("UPDATE document SET vervaldatum = ? WHERE id = ?", (_datum(vervaldatum) if vervaldatum else None, did))
-    return terug(f"/voertuigen/{d['voertuig_id']}/documenten")
+        d = fetch(conn, "document", did)
+        conn.execute("UPDATE document SET expiry_date = ? WHERE id = ?", (_date(expiry_date) if expiry_date else None, did))
+    return redirect(f"/vehicles/{d['vehicle_id']}/documents")
 
 
-# ---------- specificaties ----------
+# ---------- specs ----------
 
-@router.get("/voertuigen/{vid}/specificaties")
-def specificaties(request: Request, vid: int, opgeslagen: int = 0):
+@router.get("/vehicles/{vid}/specs")
+def specs(request: Request, vid: int, saved: int = 0):
     with db.connect() as conn:
-        v = haal(conn, "voertuig", vid)
-        bestaand = {r["sleutel"]: r["waarde"] for r in conn.execute(
-            "SELECT * FROM spec WHERE voertuig_id = ? ORDER BY volgorde", (vid,))}
-    standaard = specs_voor(v["voertuigsoort"])
-    eigen = [k for k in bestaand if k not in standaard]
-    return render(request, "specificaties.html", v=v, velden=standaard + eigen, waarden=bestaand,
-                  voorbeeld=SPEC_VOORBEELD, opgeslagen=opgeslagen)
+        v = fetch(conn, "vehicle", vid)
+        existing = {r["key"]: r["value"] for r in conn.execute(
+            "SELECT * FROM spec WHERE vehicle_id = ? ORDER BY position", (vid,))}
+    default = specs_for(v["vehicle_type"])
+    own = [k for k in existing if k not in default]
+    return render(request, "specs.html", v=v, fields=default + own, values=existing,
+                  examples=SPEC_EXAMPLES, saved=saved)
 
 
-@router.post("/voertuigen/{vid}/specificaties")
-async def specificaties_opslaan(request: Request, vid: int):
+@router.post("/vehicles/{vid}/specs")
+async def save_specs(request: Request, vid: int):
     form = await request.form()
-    sleutels, waarden = form.getlist("sleutel"), form.getlist("waarde")
-    if len(sleutels) != len(waarden):
+    keys, values = form.getlist("key"), form.getlist("value")
+    if len(keys) != len(values):
         raise HTTPException(400, "Ongeldig formulier")
-    rijen = {}
-    for sleutel, waarde in zip(sleutels, waarden):
-        sleutel, waarde = str(sleutel).strip()[:60], str(waarde).strip()[:200]
-        if sleutel and waarde and sleutel not in rijen:
-            rijen[sleutel] = waarde
+    rows = {}
+    for key, value in zip(keys, values):
+        key, value = str(key).strip()[:60], str(value).strip()[:200]
+        if key and value and key not in rows:
+            rows[key] = value
     with db.connect() as conn:
-        haal(conn, "voertuig", vid)
-        conn.execute("DELETE FROM spec WHERE voertuig_id = ?", (vid,))
-        conn.executemany("INSERT INTO spec (voertuig_id, sleutel, waarde, volgorde) VALUES (?,?,?,?)",
-                         [(vid, k, w, i) for i, (k, w) in enumerate(rijen.items())])
-    return terug(f"/voertuigen/{vid}/specificaties?opgeslagen=1")
+        fetch(conn, "vehicle", vid)
+        conn.execute("DELETE FROM spec WHERE vehicle_id = ?", (vid,))
+        conn.executemany("INSERT INTO spec (vehicle_id, key, value, position) VALUES (?,?,?,?)",
+                         [(vid, k, v, i) for i, (k, v) in enumerate(rows.items())])
+    return redirect(f"/vehicles/{vid}/specs?saved=1")
 
 
-# ---------- stalling ----------
+# ---------- storage (e.g. winter storage) ----------
 
-@router.get("/voertuigen/{vid}/stalling")
-def stalling(request: Request, vid: int):
+@router.get("/vehicles/{vid}/storage")
+def storage(request: Request, vid: int):
     with db.connect() as conn:
-        v = haal(conn, "voertuig", vid)
-        actief = db.actieve_stalling(conn, vid)
-        periodes = conn.execute("SELECT * FROM stalling WHERE voertuig_id = ? ORDER BY van DESC", (vid,)).fetchall()
-        huidige = db.huidige_km(conn, vid)
-        plan = voertuig_plan(conn, v) if actief else []
-    return render(request, "stalling.html", v=v, actief=actief, periodes=periodes, huidige_km=huidige,
-                  checklist=OPHALEN if actief else STALLEN, achterstallig=[p for p in plan if p["kleur"] != "groen"],
-                  vandaag=date.today().isoformat())
+        v = fetch(conn, "vehicle", vid)
+        active = db.active_storage(conn, vid)
+        periods = conn.execute("SELECT * FROM storage_period WHERE vehicle_id = ? ORDER BY start_date DESC", (vid,)).fetchall()
+        current = db.current_km(conn, vid)
+        plan = vehicle_plan(conn, v) if active else []
+    return render(request, "storage.html", v=v, active=active, periods=periods, current_km=current,
+                  checklist=PICKUP_CHECKLIST if active else STORE_CHECKLIST,
+                  overdue=[p for p in plan if p["color"] != "green"], today=date.today().isoformat())
 
 
-def _stalling_km(conn, vid, datum, kilometerstand):
-    km = _of_400(getal, kilometerstand)
-    if km is not None and (fout := km_controle(conn, vid, datum, km)):
-        raise HTTPException(400, fout)
+def _storage_km(conn, vid, day, odometer_km):
+    km = or_400(parse_int, odometer_km)
+    if km is not None and (error := km_check(conn, vid, day, km)):
+        raise HTTPException(400, error)
     return km
 
 
-def _niet_in_toekomst(datum: str) -> str:
-    if datum > date.today().isoformat():
+def _not_in_future(day: str) -> str:
+    if day > date.today().isoformat():
         raise HTTPException(400, "De datum ligt in de toekomst.")
-    return datum
+    return day
 
 
-@router.post("/voertuigen/{vid}/stalling/in")
-def stalling_in(vid: int, datum: str = Form(""), kilometerstand: str = Form("")):
-    datum = _niet_in_toekomst(_datum(datum or date.today().isoformat()))
+@router.post("/vehicles/{vid}/storage/start")
+def start_storage(vid: int, date_: str = Form("", alias="date"), odometer_km: str = Form("")):
+    day = _not_in_future(_date(date_ or date.today().isoformat()))
     with db.connect() as conn:
-        haal(conn, "voertuig", vid)
-        if db.actieve_stalling(conn, vid):
+        fetch(conn, "vehicle", vid)
+        if db.active_storage(conn, vid):
             raise HTTPException(400, "Dit voertuig staat al in de stalling.")
-        vorige = conn.execute("SELECT MAX(tot) FROM stalling WHERE voertuig_id = ?", (vid,)).fetchone()[0]
-        if vorige and datum < vorige:
+        previous = conn.execute("SELECT MAX(end_date) FROM storage_period WHERE vehicle_id = ?", (vid,)).fetchone()[0]
+        if previous and day < previous:
             raise HTTPException(400, "Deze datum valt in een eerdere stallingsperiode.")
-        conn.execute("INSERT INTO stalling (voertuig_id, van, km_van) VALUES (?,?,?)",
-                     (vid, datum, _stalling_km(conn, vid, datum, kilometerstand)))
-    return terug(f"/voertuigen/{vid}")
+        conn.execute("INSERT INTO storage_period (vehicle_id, start_date, start_km) VALUES (?,?,?)",
+                     (vid, day, _storage_km(conn, vid, day, odometer_km)))
+    return redirect(f"/vehicles/{vid}")
 
 
-@router.post("/voertuigen/{vid}/stalling/uit")
-def stalling_uit(vid: int, datum: str = Form(""), kilometerstand: str = Form("")):
-    datum = _niet_in_toekomst(_datum(datum or date.today().isoformat()))
+@router.post("/vehicles/{vid}/storage/end")
+def end_storage(vid: int, date_: str = Form("", alias="date"), odometer_km: str = Form("")):
+    day = _not_in_future(_date(date_ or date.today().isoformat()))
     with db.connect() as conn:
-        haal(conn, "voertuig", vid)
-        actief = db.actieve_stalling(conn, vid)
-        if not actief:
+        fetch(conn, "vehicle", vid)
+        active = db.active_storage(conn, vid)
+        if not active:
             raise HTTPException(400, "Dit voertuig staat niet in de stalling.")
-        if datum < actief["van"]:
+        if day < active["start_date"]:
             raise HTTPException(400, "De ophaaldatum ligt vóór de stallingsdatum.")
-        conn.execute("UPDATE stalling SET tot = ?, km_tot = ? WHERE id = ?",
-                     (datum, _stalling_km(conn, vid, datum, kilometerstand), actief["id"]))
-    return terug(f"/voertuigen/{vid}")
+        conn.execute("UPDATE storage_period SET end_date = ?, end_km = ? WHERE id = ?",
+                     (day, _storage_km(conn, vid, day, odometer_km), active["id"]))
+    return redirect(f"/vehicles/{vid}")
 
 
-@router.post("/stalling/{sid}/verwijderen")
-def stalling_verwijderen(sid: int):
-    """Een stallingsperiode wissen (bijv. na een tikfout in de km-stand)."""
+@router.post("/storage/{sid}/delete")
+def delete_storage(sid: int):
+    """Delete a storage period (e.g. after a typo in the reading)."""
     with db.connect() as conn:
-        vid = haal(conn, "stalling", sid)["voertuig_id"]
-        conn.execute("DELETE FROM stalling WHERE id = ?", (sid,))
-    return terug(f"/voertuigen/{vid}/stalling")
+        vid = fetch(conn, "storage_period", sid)["vehicle_id"]
+        conn.execute("DELETE FROM storage_period WHERE id = ?", (sid,))
+    return redirect(f"/vehicles/{vid}/storage")
 
 
-# ---------- planning inclusief vervaldata (APK, verzekering, ...) ----------
+# ---------- planning including expiry dates (APK, insurance, ...) ----------
 
-def vervaldata(conn, v) -> list[tuple[str, str, str]]:
-    """(naam, datum, bron) van dingen met een vervaldatum: APK uit de RDW en documenten."""
+def expiries(conn, v) -> list[tuple[str, str, str]]:
+    """(name, date, source) of things with an expiry date: APK from the RDW and documents."""
     items = []
     try:
-        apk = json.loads(v["rdw_json"] or "{}").get("apk_vervaldatum")
+        apk = json.loads(v["rdw_json"] or "{}").get("apk_expiry_date")
     except ValueError:
         apk = None
     if apk:
         items.append(("APK verloopt", apk, "rdw"))
-    for d in conn.execute("SELECT soort, titel, vervaldatum FROM document WHERE voertuig_id = ? AND vervaldatum IS NOT NULL",
+    for d in conn.execute("SELECT kind, title, expiry_date FROM document WHERE vehicle_id = ? AND expiry_date IS NOT NULL",
                           (v["id"],)):
-        items.append((f"{d['titel'] or d['soort']} verloopt", d["vervaldatum"], "document"))
+        items.append((f"{d['title'] or d['kind']} verloopt", d["expiry_date"], "document"))
 
-    def geldig(datum) -> bool:  # een kapotte datum mag nooit een hele pagina laten crashen
+    def valid(day) -> bool:  # a broken date must never crash a whole page
         try:
-            date.fromisoformat(datum)
+            date.fromisoformat(day)
             return True
         except (TypeError, ValueError):
             return False
-    return [i for i in items if geldig(i[1])]
+    return [i for i in items if valid(i[1])]
 
 
-def voertuig_plan(conn, v, beurten=None, huidige_km=None) -> list[dict]:
-    beurten = beurten if beurten is not None else db.beurten(conn, v["id"])
-    huidige_km = huidige_km if huidige_km is not None else db.huidige_km(conn, v["id"])
-    plan = planning.overzicht(beurten, huidige_km, intervallen=db.intervallen(conn, v["id"]))
-    plan += [planning.vervalstatus(naam, datum, bron) for naam, datum, bron in vervaldata(conn, v)]
-    volgorde = {"rood": 0, "oranje": 1, "groen": 2}
-    return sorted(plan, key=lambda p: (volgorde[p["kleur"]], p["naam"]))
+def vehicle_plan(conn, v, services=None, current_km=None) -> list[dict]:
+    services = services if services is not None else db.services(conn, v["id"])
+    current_km = current_km if current_km is not None else db.current_km(conn, v["id"])
+    plan = planning.overview(services, current_km, intervals=db.intervals(conn, v["id"]))
+    plan += [planning.expiry_status(name, day, source) for name, day, source in expiries(conn, v)]
+    order = {"red": 0, "orange": 1, "green": 2}
+    return sorted(plan, key=lambda p: (order[p["color"]], p["name"]))
 
 
-# ---------- back-up ----------
+# ---------- backup ----------
 
 def backup_context(conn) -> dict:
     st = backup.status(conn)
-    return {"backup": st, "backups": backup.alle(st["map"])}
+    return {"backup": st, "backups": backup.all_backups(st["folder"])}
 
 
-@router.post("/backup/nu")
-def backup_nu():
+@router.post("/backup/now")
+def backup_now():
     try:
-        backup.maak()
-    except backup.BackupFout as e:
+        backup.create()
+    except backup.BackupError as e:
         with db.connect() as conn:
-            db.zet_instelling(conn, "backup_fout", str(e))
-        return terug("/instellingen?backup=fout#backup")
-    return terug("/instellingen?backup=gemaakt#backup")
+            db.set_setting(conn, "backup_error", str(e))
+        return redirect("/settings?backup=error#backup")
+    return redirect("/settings?backup=made#backup")
 
 
-@router.post("/backup/instellingen")
-def backup_instellingen(map: str = Form(""), auto: str = Form("")):
+@router.post("/backup/settings")
+def backup_settings(folder: str = Form(""), auto: str = Form("")):
     with db.connect() as conn:
-        if map.strip():
+        if folder.strip():
             try:
-                db.zet_instelling(conn, "backup_map", str(backup.controleer_doelmap(Path(map.strip()))))
-            except backup.BackupFout as e:
+                db.set_setting(conn, "backup_folder", str(backup.check_target_folder(Path(folder.strip()))))
+            except backup.BackupError as e:
                 raise HTTPException(400, str(e))
-        db.zet_instelling(conn, "backup_auto", "aan" if auto else "uit")
-    return terug("/instellingen?backup=opgeslagen#backup")
+        db.set_setting(conn, "backup_auto", "on" if auto else "off")
+    return redirect("/settings?backup=saved#backup")
 
 
-def _herstel(zip_pad: Path):
+def _restore(zip_path: Path):
     try:
-        veiligheid = backup.herstel(zip_pad)
-    except backup.BackupFout as e:
+        safety = backup.restore(zip_path)
+    except backup.BackupError as e:
         raise HTTPException(400, str(e))
-    return terug(f"/?hersteld={veiligheid.name}")
+    return redirect(f"/?restored={safety.name}")
 
 
-@router.post("/backup/terugzetten")
-def backup_terugzetten(naam: str = Form(...)):
+@router.post("/backup/restore")
+def restore_backup(name: str = Form(...)):
     with db.connect() as conn:
-        map_ = backup.doelmap(conn)
-    # alleen een back-up uit de lijst (geen willekeurig pad van buitenaf)
-    kandidaat = next((b["pad"] for b in backup.alle(map_) if b["naam"] == naam), None)
-    if not kandidaat:
+        folder = backup.target_folder(conn)
+    # only a backup from the list (no arbitrary path from outside)
+    candidate = next((b["path"] for b in backup.all_backups(folder) if b["name"] == name), None)
+    if not candidate:
         raise HTTPException(404, "Back-up niet gevonden")
-    return _herstel(kandidaat)
+    return _restore(candidate)
 
 
-@router.post("/backup/terugzetten-bestand")
-async def backup_terugzetten_bestand(bestand: UploadFile = File(...)):
+@router.post("/backup/restore-file")
+async def restore_backup_file(file: UploadFile = File(...)):
     with tempfile.TemporaryDirectory() as tmp:
-        pad = Path(tmp) / "upload.zip"
-        with open(pad, "wb") as uit:
-            shutil.copyfileobj(bestand.file, uit)
-        return _herstel(pad)
+        path = Path(tmp) / "upload.zip"
+        with open(path, "wb") as out:
+            shutil.copyfileobj(file.file, out)
+        return _restore(path)
 
 
-# ---------- herinneringen ----------
+# ---------- reminders ----------
 
-@router.post("/herinneringen")
-def herinneringen(aan: str = Form("")):
+@router.post("/reminders")
+def reminders(on: str = Form("")):
     with db.connect() as conn:
-        db.zet_instelling(conn, "herinneringen", "aan" if aan else "uit")
-    return terug("/instellingen?herinneringen=opgeslagen#herinneringen")
+        db.set_setting(conn, "reminders", "on" if on else "off")
+    return redirect("/settings?reminders=saved#reminders")
 
 
 @router.post("/privacy")
-def privacy(sketchfab_auto: str = Form("")):
+def privacy(sketchfab_autoload: str = Form("")):
     with db.connect() as conn:
-        db.zet_instelling(conn, "sketchfab_auto", "aan" if sketchfab_auto else "uit")
-    return terug("/instellingen?privacy=opgeslagen#privacy")
+        db.set_setting(conn, "sketchfab_autoload", "on" if sketchfab_autoload else "off")
+    return redirect("/settings?privacy=saved#privacy")
 
 
-def controle_meldingen() -> list[str]:
-    """Wat er aandacht nodig heeft, voor een Windows-melding (voertuigen in stalling worden overgeslagen)."""
-    regels = []
+def check_notifications() -> list[tuple[str, str]]:
+    """What needs attention, for a Windows notification (vehicles in storage are skipped).
+    Returns (key, text): the key identifies the situation, the text is shown."""
+    lines = []
     with db.connect() as conn:
-        for v in conn.execute("SELECT * FROM voertuig ORDER BY id").fetchall():
-            if db.actieve_stalling(conn, v["id"]):
+        for v in conn.execute("SELECT * FROM vehicle ORDER BY id").fetchall():
+            if db.active_storage(conn, v["id"]):
                 continue
-            naam = v["bijnaam"] or f"{v['merk'] or ''} {v['model'] or ''}".strip() or v["kenteken"]
-            for p in voertuig_plan(conn, v):
-                if p["kleur"] != "groen":
-                    regels.append((f"{v['id']}|{p['naam']}|{p['kleur']}", f"{naam}: {p['naam'].lower()} ({p['tekst']})"))
+            name = v["nickname"] or f"{v['make'] or ''} {v['model'] or ''}".strip() or v["license_plate"]
+            for p in vehicle_plan(conn, v):
+                if p["color"] != "green":
+                    lines.append((f"{v['id']}|{p['name']}|{p['color']}", f"{name}: {p['name'].lower()} ({p['text']})"))
         st = backup.status(conn)
-        if st["auto"] and st["te_oud"] and conn.execute("SELECT 1 FROM voertuig LIMIT 1").fetchone():
-            regels.append(("backup", "Er is al een tijd geen back-up gemaakt."))
-    return regels
+        if st["auto"] and st["too_old"] and conn.execute("SELECT 1 FROM vehicle LIMIT 1").fetchone():
+            lines.append(("backup", "Er is al een tijd geen back-up gemaakt."))
+    return lines
 
 
-def _sleutel(regels) -> str:
-    """Wat er aan de hand is, zonder de aftellende tekst ('nog 9 dagen'), zodat 'dezelfde melding' herkenbaar is."""
-    return "\n".join(sorted(s for s, _ in regels))
+def _key(lines) -> str:
+    """What is going on, without the counting-down text ('nog 9 dagen'), so 'the same notification' is recognizable."""
+    return "\n".join(sorted(k for k, _ in lines))
 
 
-def mag_melden(regels) -> bool:
-    """Hooguit één melding per dag, en dezelfde situatie pas na een week opnieuw."""
-    if not regels:
+def may_notify(lines) -> bool:
+    """At most one notification per day, and the same situation only again after a week."""
+    if not lines:
         return False
     with db.connect() as conn:
-        if db.instelling(conn, "herinneringen", "aan") != "aan":
+        if db.setting(conn, "reminders", "on") != "on":
             return False
         try:
-            vorige = json.loads(db.instelling(conn, "melding_laatst", "{}") or "{}")
-            nu = datetime.now()
-            if vorige.get("datum") == nu.date().isoformat():
+            previous = json.loads(db.setting(conn, "last_notification", "{}") or "{}")
+            now = datetime.now()
+            if previous.get("date") == now.date().isoformat():
                 return False
-            if vorige.get("sleutel") == _sleutel(regels) and (nu - datetime.fromisoformat(vorige["tijd"])).days < 7:
+            if previous.get("key") == _key(lines) and (now - datetime.fromisoformat(previous["time"])).days < 7:
                 return False
         except (ValueError, KeyError, TypeError):
-            pass  # kapotte administratie: dan gewoon melden
+            pass  # broken bookkeeping: then just notify
     return True
 
 
-def gemeld(regels) -> None:
-    """Pas vastleggen nadat de melding echt getoond is (mislukt PowerShell, dan morgen opnieuw proberen)."""
-    nu = datetime.now()
+def notified(lines) -> None:
+    """Only record this after the notification was really shown (if PowerShell fails, try again tomorrow)."""
+    now = datetime.now()
     with db.connect() as conn:
-        db.zet_instelling(conn, "melding_laatst", json.dumps({"datum": nu.date().isoformat(), "tijd": nu.isoformat(),
-                                                               "sleutel": _sleutel(regels)}))
+        db.set_setting(conn, "last_notification", json.dumps({"date": now.date().isoformat(), "time": now.isoformat(),
+                                                              "key": _key(lines)}))

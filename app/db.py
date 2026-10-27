@@ -1,13 +1,17 @@
+import json
 import os
 import re
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-# resolve(): bestand() geeft opgeloste paden terug; een kort 8.3-pad (DANIEL~1) of koppeling hier zou relative_to() breken
-DATA_DIR = Path(os.environ.get("ONDERHOUD_DATA", Path(__file__).resolve().parent.parent / "data")).resolve()
+# GARAGE_DATA overrides the data folder; ONDERHOUD_DATA is the old name and still works.
+# resolve(): data_file() returns resolved paths; a short 8.3 path (DANIEL~1) or link here would break relative_to()
+DATA_DIR = Path(os.environ.get("GARAGE_DATA") or os.environ.get("ONDERHOUD_DATA")
+                or Path(__file__).resolve().parent.parent / "data").resolve()
+DB_NAME = "onderhoud.db"  # file name stays Dutch: users see it in their data folder and in backups
 
-# Schema tot en met versie 1.3.0 (migratie 1). Niet meer aanpassen: een wijziging wordt een nieuwe migratie.
+# Schema up to version 1.3.0 (migration 1), with the original Dutch names. Never change this: a change is a new migration.
 SCHEMA_1 = """
 CREATE TABLE IF NOT EXISTS voertuig (
     id INTEGER PRIMARY KEY,
@@ -70,30 +74,63 @@ CREATE TABLE IF NOT EXISTS voertuig_interval (
 );
 """
 
-# Kolommen die vóór de migraties (tot en met 1.3.0) later zijn toegevoegd; migratie 1 vult ze aan in oude databases.
-KOLOMMEN_1 = {
+# Columns added later, before migrations existed (up to 1.3.0); migration 1 adds them to old databases.
+COLUMNS_1 = {
     "voertuig": {
-        "beeld_type": "TEXT",    # '3d', 'foto' of 'eigen'
-        "beeld_ref": "TEXT",     # Sketchfab-uid bij 3d
-        "beeld_titel": "TEXT",
-        "beeld_bron": "TEXT",    # link naar de bron (naamsvermelding)
-        "beeld_pad": "TEXT",     # lokale afbeelding (ook offline-terugval voor 3d)
-        "schema_bron": "TEXT",   # waar de eigen intervallen vandaan komen, bijv. instructieboekje
-        "rdw_json": "TEXT",      # extra RDW-gegevens (APK, terugroepactie, tellerstandoordeel, ...)
-        "rdw_bijgewerkt": "TEXT",
+        "beeld_type": "TEXT", "beeld_ref": "TEXT", "beeld_titel": "TEXT", "beeld_bron": "TEXT", "beeld_pad": "TEXT",
+        "schema_bron": "TEXT", "rdw_json": "TEXT", "rdw_bijgewerkt": "TEXT",
     },
-    "factuur": {
-        "origineel_pad": "TEXT",  # niet-gelakte versie; NULL = nog niet gelakt (pad is dan het origineel)
-        "gecontroleerd": "INTEGER NOT NULL DEFAULT 0",
-        "boxen": "TEXT",          # JSON van de toegepaste balken, zodat opnieuw lakken daarop voortbouwt
-    },
+    "factuur": {"origineel_pad": "TEXT", "gecontroleerd": "INTEGER NOT NULL DEFAULT 0", "boxen": "TEXT"},
 }
 
-MOTOR = "Motorfiets,Bromfiets"
-AUTO = "Personenauto,Bedrijfsauto"
+# Migration 2: Dutch -> English names. {old table: (new table, {old column: new column})}
+RENAMES_2 = {
+    "voertuig": ("vehicle", {
+        "kenteken": "license_plate", "voertuigsoort": "vehicle_type", "merk": "make",
+        "datum_eerste_toelating": "first_registration_date", "kleur": "color", "cilinderinhoud": "displacement_cc",
+        "bijnaam": "nickname", "beeld_type": "image_type", "beeld_ref": "image_ref", "beeld_titel": "image_title",
+        "beeld_bron": "image_source", "beeld_pad": "image_path", "schema_bron": "schedule_source",
+        "rdw_bijgewerkt": "rdw_updated_on"}),
+    "onderhoudstype": ("maintenance_type", {
+        "naam": "name", "voertuigsoorten": "vehicle_types", "interval_maanden": "interval_months"}),
+    "voertuig_interval": ("vehicle_interval", {"voertuig_id": "vehicle_id", "interval_maanden": "interval_months"}),
+    "beurt": ("service", {
+        "voertuig_id": "vehicle_id", "datum": "date", "kilometerstand": "odometer_km", "uitgevoerd_door": "performed_by",
+        "kosten": "cost", "opmerking": "note"}),
+    "beurt_type": ("service_maintenance_type", {"beurt_id": "service_id"}),
+    "factuur": ("invoice", {
+        "beurt_id": "service_id", "pad": "path", "originele_naam": "original_filename", "origineel_pad": "original_path",
+        "gecontroleerd": "reviewed", "boxen": "redactions"}),
+    "document": ("document", {
+        "voertuig_id": "vehicle_id", "soort": "kind", "titel": "title", "pad": "path",
+        "originele_naam": "original_filename", "vervaldatum": "expiry_date", "toegevoegd": "added_on"}),
+    "km_stand": ("odometer_reading", {
+        "voertuig_id": "vehicle_id", "datum": "date", "kilometerstand": "odometer_km", "opmerking": "note"}),
+    "stalling": ("storage_period", {
+        "voertuig_id": "vehicle_id", "van": "start_date", "tot": "end_date", "km_van": "start_km", "km_tot": "end_km"}),
+    "spec": ("spec", {"voertuig_id": "vehicle_id", "sleutel": "key", "waarde": "value", "volgorde": "position"}),
+    "instelling": ("setting", {"sleutel": "key", "waarde": "value"}),
+}
+SETTING_KEYS_2 = {
+    "thema": "theme", "prive_termen": "private_terms", "herinneringen": "reminders",
+    "melding_laatst": "last_notification", "sketchfab_auto": "sketchfab_autoload", "backup_auto": "backup_auto",
+    "backup_map": "backup_folder", "backup_laatste": "backup_last", "backup_fout": "backup_error",
+    "secure_delete_opgeschoond": "secure_delete_vacuumed",
+}
+SETTING_VALUES_2 = {"aan": "on", "uit": "off", "ja": "yes", "licht": "light", "donker": "dark", "systeem": "system"}
+RDW_KEYS_2 = {
+    "apk_vervaldatum": "apk_expiry_date", "terugroepactie": "open_recall", "tellerstandoordeel": "odometer_judgement",
+    "jaar_tellerstand": "odometer_year", "catalogusprijs": "list_price",
+    "datum_tenaamstelling_nl": "first_registration_nl_date", "massa_rijklaar": "curb_weight_kg", "brandstof": "fuel",
+    "vermogen_kw": "power_kw",
+}
+IMAGE_TYPES_2 = {"foto": "photo", "eigen": "own"}
 
-# (naam, voertuigsoorten, interval_km, interval_maanden)
-STANDAARD_TYPES = [
+MOTORCYCLE = "Motorfiets,Bromfiets"
+CAR = "Personenauto,Bedrijfsauto"
+
+# (name, vehicle_types, interval_km, interval_months); names and vehicle types are shown in the app, so Dutch
+DEFAULT_TYPES = [
     ("Olie vervangen", "*", 6000, 12),
     ("Oliefilter vervangen", "*", 6000, 12),
     ("Luchtfilter vervangen", "*", 12000, 24),
@@ -106,27 +143,28 @@ STANDAARD_TYPES = [
     ("Accu vervangen", "*", None, None),
     ("Kleine beurt", "*", None, 12),
     ("Grote beurt", "*", None, 24),
-    ("Ketting smeren/spannen", MOTOR, 1000, None),
-    ("Ketting + tandwielen vervangen", MOTOR, None, None),
-    ("Kleppen stellen", MOTOR, 24000, None),
-    ("APK", AUTO, None, 12),
-    ("Distributieriem vervangen", AUTO, 120000, 72),
-    ("Interieurfilter vervangen", AUTO, 15000, 12),
-    ("Ruitenwissers vervangen", AUTO, None, 12),
-    ("Airco-service", AUTO, None, 24),
+    ("Ketting smeren/spannen", MOTORCYCLE, 1000, None),
+    ("Ketting + tandwielen vervangen", MOTORCYCLE, None, None),
+    ("Kleppen stellen", MOTORCYCLE, 24000, None),
+    ("APK", CAR, None, 12),
+    ("Distributieriem vervangen", CAR, 120000, 72),
+    ("Interieurfilter vervangen", CAR, 15000, 12),
+    ("Ruitenwissers vervangen", CAR, None, 12),
+    ("Airco-service", CAR, None, 24),
     ("Lagers/verlichting controleren", "Aanhangwagen", None, 12),
     ("Overig", "*", None, None),
 ]
+OTHER_TYPE = "Overig"  # the catch-all maintenance type, always listed last
 
 
 @contextmanager
 def connect():
-    """Verbinding die bij succes commit, bij een fout terugdraait en altijd wordt gesloten."""
+    """Connection that commits on success, rolls back on an error and is always closed."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DATA_DIR / "onderhoud.db")
+    conn = sqlite3.connect(DATA_DIR / DB_NAME)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    # verwijderde gegevens met nullen overschrijven; anders blijven ze in vrije pagina's staan (en gaan ze mee in back-ups)
+    # overwrite deleted data with zeros; otherwise it stays in free pages (and ends up in backups)
     conn.execute("PRAGMA secure_delete = ON")
     try:
         with conn:
@@ -135,45 +173,83 @@ def connect():
         conn.close()
 
 
-class SchemaFout(Exception):
+class SchemaError(Exception):
     pass
 
 
-def _migratie_1(conn: sqlite3.Connection) -> None:
-    """Basis: het schema van 1.3.0. Werkt ook op databases van vóór de migraties (user_version 0), die
-    tabellen of later toegevoegde kolommen kunnen missen."""
-    for opdracht in filter(str.strip, SCHEMA_1.split(";")):
-        conn.execute(opdracht)
-    for tabel, kolommen in KOLOMMEN_1.items():
-        bestaand = {r["name"] for r in conn.execute(f"PRAGMA table_info({tabel})")}
-        for kolom, soort in kolommen.items():
-            if kolom not in bestaand:
-                conn.execute(f"ALTER TABLE {tabel} ADD COLUMN {kolom} {soort}")
+def _migration_1(conn: sqlite3.Connection) -> None:
+    """Baseline: the schema of 1.3.0. Also works on databases from before migrations (user_version 0), which can
+    miss tables or columns that were added later."""
+    for statement in filter(str.strip, SCHEMA_1.split(";")):
+        conn.execute(statement)
+    for table, columns in COLUMNS_1.items():
+        existing = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        for column, kind in columns.items():
+            if column not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
 
 
-# Migratie n zet de database van versie n-1 naar n (PRAGMA user_version). Alleen achteraan toevoegen, nooit een
-# bestaande migratie wijzigen. Een migratie draait in één transactie; PRAGMA foreign_keys kan daarin niet
-# wisselen, dus een tabel herbouwen gaat met de stappen uit https://sqlite.org/lang_altertable.html.
-MIGRATIES = [_migratie_1]
-SCHEMAVERSIE = len(MIGRATIES)
+def _rename_json_keys(conn: sqlite3.Connection, table: str, column: str, convert) -> None:
+    # table and column are fixed names from _migration_2 (a name cannot be a ?-parameter), never input
+    for row in conn.execute(f"SELECT rowid, {column} FROM {table} WHERE {column} IS NOT NULL").fetchall():  # nosec B608
+        try:
+            data = json.loads(row[1])
+        except ValueError:
+            continue  # unreadable JSON stays as it is; the app already treats it as empty
+        conn.execute(f"UPDATE {table} SET {column} = ? WHERE rowid = ?",  # nosec B608
+                     (json.dumps(convert(data)), row[0]))
 
 
-def schemaversie(conn: sqlite3.Connection) -> int:
+def _migration_2(conn: sqlite3.Connection) -> None:
+    """Dutch -> English names for tables, columns and internal values. RENAME also updates foreign keys.
+    Values the user sees (vehicle types, document kinds, maintenance type names) stay Dutch."""
+    for old, (new, columns) in RENAMES_2.items():
+        for old_column, new_column in columns.items():
+            conn.execute(f'ALTER TABLE {old} RENAME COLUMN {old_column} TO "{new_column}"')
+        if new != old:
+            conn.execute(f"ALTER TABLE {old} RENAME TO {new}")
+    for old, new in SETTING_KEYS_2.items():
+        conn.execute("UPDATE setting SET key = ? WHERE key = ?", (new, old))
+    for old, new in SETTING_VALUES_2.items():
+        conn.execute("UPDATE setting SET value = ? WHERE value = ? AND key != 'private_terms'", (new, old))
+    conn.execute("DELETE FROM setting WHERE key = 'last_notification'")  # only limits repeats; rebuilt by itself
+
+    def rdw(data):
+        return {RDW_KEYS_2.get(k, k): v for k, v in data.items()} if isinstance(data, dict) else data
+
+    def redactions(data):
+        return [{("page" if k == "pagina" else k): v for k, v in b.items()} if isinstance(b, dict) else b
+                for b in data] if isinstance(data, list) else data
+
+    _rename_json_keys(conn, "vehicle", "rdw_json", rdw)
+    _rename_json_keys(conn, "invoice", "redactions", redactions)
+    for old, new in IMAGE_TYPES_2.items():
+        conn.execute("UPDATE vehicle SET image_type = ? WHERE image_type = ?", (new, old))
+
+
+# Migration n takes the database from version n-1 to n (PRAGMA user_version). Only append, never change an
+# existing migration. A migration runs in one transaction; PRAGMA foreign_keys cannot change inside it, so
+# rebuilding a table follows the steps in https://sqlite.org/lang_altertable.html.
+MIGRATIONS = [_migration_1, _migration_2]
+SCHEMA_VERSION = len(MIGRATIONS)
+
+
+def schema_version(conn: sqlite3.Connection) -> int:
     return conn.execute("PRAGMA user_version").fetchone()[0]
 
 
-def migreer(conn: sqlite3.Connection) -> None:
-    """Voert de ontbrekende migraties uit, elk met de nieuwe versie in dezelfde transactie: gaat er iets mis,
-    dan blijft de database op de laatste goede versie staan."""
-    versie = schemaversie(conn)
-    if versie > SCHEMAVERSIE:
-        raise SchemaFout(f"De gegevens zijn van een nieuwere versie van Garage (schema {versie}, deze versie kent "
-                         f"tot {SCHEMAVERSIE}). Installeer de nieuwste versie.")
-    for nummer in range(versie + 1, SCHEMAVERSIE + 1):
+def migrate(conn: sqlite3.Connection) -> None:
+    """Runs the missing migrations, each with the new version in the same transaction: if anything goes wrong,
+    the database stays at the last good version."""
+    version = schema_version(conn)
+    if version > SCHEMA_VERSION:
+        raise SchemaError(f"De gegevens zijn van een nieuwere versie van Garage (schema {version}, deze versie kent "
+                          f"tot {SCHEMA_VERSION}). Installeer de nieuwste versie.")
+    for number in range(version + 1, SCHEMA_VERSION + 1):
         conn.execute("BEGIN")
         try:
-            MIGRATIES[nummer - 1](conn)
-            conn.execute(f"PRAGMA user_version = {nummer:d}")
+            MIGRATIONS[number - 1](conn)
+            conn.execute(f"PRAGMA user_version = {number:d}")
             conn.commit()
         except BaseException:
             conn.rollback()
@@ -182,105 +258,108 @@ def migreer(conn: sqlite3.Connection) -> None:
 
 def init() -> None:
     with connect() as conn:
-        migreer(conn)
-        if not instelling(conn, "secure_delete_opgeschoond"):
-            # eenmalig: wat vóór secure_delete is verwijderd, staat nog in vrije pagina's; VACUUM herschrijft het bestand
+        migrate(conn)
+        if not setting(conn, "secure_delete_vacuumed"):
+            # once: data deleted before secure_delete is still in free pages; VACUUM rewrites the file
             conn.execute("VACUUM")
-            zet_instelling(conn, "secure_delete_opgeschoond", "ja")
-        if not conn.execute("SELECT 1 FROM onderhoudstype LIMIT 1").fetchone():
+            set_setting(conn, "secure_delete_vacuumed", "yes")
+        if not conn.execute("SELECT 1 FROM maintenance_type LIMIT 1").fetchone():
             conn.executemany(
-                "INSERT INTO onderhoudstype (naam, voertuigsoorten, interval_km, interval_maanden) VALUES (?,?,?,?)",
-                STANDAARD_TYPES,
+                "INSERT INTO maintenance_type (name, vehicle_types, interval_km, interval_months) VALUES (?,?,?,?)",
+                DEFAULT_TYPES,
             )
 
 
-def types_voor(conn: sqlite3.Connection, voertuigsoort: str) -> list[sqlite3.Row]:
-    """Onderhoudstypes die bij deze voertuigsoort horen ('*' = alle soorten)."""
-    rows = conn.execute("SELECT * FROM onderhoudstype ORDER BY naam = 'Overig', naam").fetchall()
-    return [r for r in rows if r["voertuigsoorten"] == "*" or voertuigsoort in r["voertuigsoorten"].split(",")]
+def types_for(conn: sqlite3.Connection, vehicle_type: str) -> list[sqlite3.Row]:
+    """Maintenance types that apply to this vehicle type ('*' = all types)."""
+    rows = conn.execute("SELECT * FROM maintenance_type ORDER BY name = ?, name", (OTHER_TYPE,)).fetchall()
+    return [r for r in rows if r["vehicle_types"] == "*" or vehicle_type in r["vehicle_types"].split(",")]
 
 
-def beurten(conn: sqlite3.Connection, voertuig_id: int) -> list[dict]:
-    """Beurten van een voertuig, nieuwste eerst, met hun types en facturen."""
+def services(conn: sqlite3.Connection, vehicle_id: int) -> list[dict]:
+    """Services of a vehicle, newest first, with their maintenance types and invoices."""
     result = []
-    for b in conn.execute(
-        "SELECT * FROM beurt WHERE voertuig_id = ? ORDER BY datum DESC, id DESC", (voertuig_id,)
+    for s in conn.execute(
+        "SELECT * FROM service WHERE vehicle_id = ? ORDER BY date DESC, id DESC", (vehicle_id,)
     ):
-        d = dict(b)
+        d = dict(s)
         d["types"] = conn.execute(
-            "SELECT t.* FROM onderhoudstype t JOIN beurt_type bt ON bt.type_id = t.id WHERE bt.beurt_id = ? ORDER BY t.naam",
-            (b["id"],),
+            "SELECT t.* FROM maintenance_type t JOIN service_maintenance_type st ON st.type_id = t.id "
+            "WHERE st.service_id = ? ORDER BY t.name", (s["id"],),
         ).fetchall()
-        d["facturen"] = conn.execute("SELECT * FROM factuur WHERE beurt_id = ? ORDER BY id", (b["id"],)).fetchall()
+        d["invoices"] = conn.execute("SELECT * FROM invoice WHERE service_id = ? ORDER BY id", (s["id"],)).fetchall()
         result.append(d)
     return result
 
 
-def instelling(conn: sqlite3.Connection, sleutel: str, standaard: str = "") -> str:
-    rij = conn.execute("SELECT waarde FROM instelling WHERE sleutel = ?", (sleutel,)).fetchone()
-    return rij["waarde"] if rij else standaard
+def setting(conn: sqlite3.Connection, key: str, default: str = "") -> str:
+    row = conn.execute("SELECT value FROM setting WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else default
 
 
-def zet_instelling(conn: sqlite3.Connection, sleutel: str, waarde: str) -> None:
-    conn.execute("INSERT INTO instelling (sleutel, waarde) VALUES (?, ?) "
-                 "ON CONFLICT(sleutel) DO UPDATE SET waarde = excluded.waarde", (sleutel, waarde))
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute("INSERT INTO setting (key, value) VALUES (?, ?) "
+                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
 
 
-def prive_termen(conn: sqlite3.Connection) -> list[str]:
-    return [t.strip() for t in instelling(conn, "prive_termen").splitlines() if len(t.strip()) >= 3]
+def private_terms(conn: sqlite3.Connection) -> list[str]:
+    return [t.strip() for t in setting(conn, "private_terms").splitlines() if len(t.strip()) >= 3]
 
 
-def intervallen(conn: sqlite3.Connection, voertuig_id: int) -> dict[int, tuple[int | None, int | None]]:
-    """Eigen intervallen van een voertuig: {type_id: (km, maanden)}. Ontbreekt een type, dan geldt de vuistregel."""
-    return {r["type_id"]: (r["interval_km"], r["interval_maanden"]) for r in conn.execute(
-        "SELECT * FROM voertuig_interval WHERE voertuig_id = ?", (voertuig_id,))}
+def intervals(conn: sqlite3.Connection, vehicle_id: int) -> dict[int, tuple[int | None, int | None]]:
+    """Custom intervals of a vehicle: {type_id: (km, months)}. A missing type uses the rule of thumb."""
+    return {r["type_id"]: (r["interval_km"], r["interval_months"]) for r in conn.execute(
+        "SELECT * FROM vehicle_interval WHERE vehicle_id = ?", (vehicle_id,))}
 
 
-def kmverloop(conn: sqlite3.Connection, voertuig_id: int) -> list[dict]:
-    """Alle bekende km-standen (beurten, losse registraties, stalling), oud naar nieuw."""
-    rijen = conn.execute("""
-        SELECT datum, kilometerstand, 'beurt' AS bron, id FROM beurt
-            WHERE voertuig_id = ? AND kilometerstand IS NOT NULL
-        UNION ALL SELECT datum, kilometerstand, 'notitie', id FROM km_stand WHERE voertuig_id = ?
-        UNION ALL SELECT van, km_van, 'stalling in', NULL FROM stalling WHERE voertuig_id = ? AND km_van IS NOT NULL
-        UNION ALL SELECT tot, km_tot, 'stalling uit', NULL FROM stalling WHERE voertuig_id = ? AND km_tot IS NOT NULL
-        ORDER BY datum, kilometerstand""", (voertuig_id,) * 4).fetchall()
-    return [dict(r) for r in rijen]
+def odometer_history(conn: sqlite3.Connection, vehicle_id: int) -> list[dict]:
+    """All known odometer readings (services, separate readings, storage), oldest first."""
+    rows = conn.execute("""
+        SELECT date, odometer_km, 'service' AS source, id FROM service
+            WHERE vehicle_id = ? AND odometer_km IS NOT NULL
+        UNION ALL SELECT date, odometer_km, 'reading', id FROM odometer_reading WHERE vehicle_id = ?
+        UNION ALL SELECT start_date, start_km, 'storage_start', NULL FROM storage_period
+            WHERE vehicle_id = ? AND start_km IS NOT NULL
+        UNION ALL SELECT end_date, end_km, 'storage_end', NULL FROM storage_period
+            WHERE vehicle_id = ? AND end_km IS NOT NULL
+        ORDER BY date, odometer_km""", (vehicle_id,) * 4).fetchall()
+    return [dict(r) for r in rows]
 
 
-def huidige_km(conn: sqlite3.Connection, voertuig_id: int) -> int | None:
-    return max((r["kilometerstand"] for r in kmverloop(conn, voertuig_id)), default=None)
+def current_km(conn: sqlite3.Connection, vehicle_id: int) -> int | None:
+    return max((r["odometer_km"] for r in odometer_history(conn, vehicle_id)), default=None)
 
 
-def actieve_stalling(conn: sqlite3.Connection, voertuig_id: int):
-    return conn.execute("SELECT * FROM stalling WHERE voertuig_id = ? AND tot IS NULL ORDER BY id DESC LIMIT 1",
-                        (voertuig_id,)).fetchone()
+def active_storage(conn: sqlite3.Connection, vehicle_id: int):
+    return conn.execute("SELECT * FROM storage_period WHERE vehicle_id = ? AND end_date IS NULL ORDER BY id DESC LIMIT 1",
+                        (vehicle_id,)).fetchone()
 
 
-GELDIG_PAD = re.compile(r"(facturen|beelden|documenten)/[\w.\-/]+")
-MIME_TYPES = {"application/pdf", "image/jpeg", "image/png"}  # gelijk aan de types in web.TOEGESTAAN
+# folder names stay Dutch: users see them in their data folder
+VALID_PATH = re.compile(r"(facturen|beelden|documenten)/[\w.\-/]+")
+MIME_TYPES = {"application/pdf", "image/jpeg", "image/png"}  # same as the types in web.ALLOWED
 
 
-def bestand(rel: str | None) -> Path:
-    """Pad uit de database -> bestand in de gegevensmap. Weigert alles daarbuiten (bijv. uit een
-    gemanipuleerde back-up: absolute paden, '..', andere schijven)."""
-    if not rel or not GELDIG_PAD.fullmatch(rel) or ".." in rel.split("/"):
+def data_file(rel: str | None) -> Path:
+    """Path from the database -> file in the data folder. Refuses everything outside it (e.g. from a
+    tampered backup: absolute paths, '..', other drives)."""
+    if not rel or not VALID_PATH.fullmatch(rel) or ".." in rel.split("/"):
         raise ValueError(f"Ongeldig bestandspad: {rel!r}")
-    pad = (DATA_DIR / rel).resolve()
-    if DATA_DIR.resolve() not in pad.parents:
+    path = (DATA_DIR / rel).resolve()
+    if DATA_DIR.resolve() not in path.parents:
         raise ValueError(f"Bestandspad buiten de gegevensmap: {rel!r}")
-    return pad
+    return path
 
 
-def ongeldige_paden(conn: sqlite3.Connection) -> list[str]:
-    """Alle bestandspaden in de database die niet door bestand() komen (controle na terugzetten)."""
-    paden = [r[0] for r in conn.execute(
-        "SELECT pad FROM factuur UNION ALL SELECT origineel_pad FROM factuur WHERE origineel_pad IS NOT NULL "
-        "UNION ALL SELECT beeld_pad FROM voertuig WHERE beeld_pad IS NOT NULL UNION ALL SELECT pad FROM document")]
-    fout = []
-    for p in paden:
+def invalid_paths(conn: sqlite3.Connection) -> list[str]:
+    """All file paths in the database that data_file() refuses (check after a restore)."""
+    paths = [r[0] for r in conn.execute(
+        "SELECT path FROM invoice UNION ALL SELECT original_path FROM invoice WHERE original_path IS NOT NULL "
+        "UNION ALL SELECT image_path FROM vehicle WHERE image_path IS NOT NULL UNION ALL SELECT path FROM document")]
+    invalid = []
+    for p in paths:
         try:
-            bestand(p)
+            data_file(p)
         except ValueError:
-            fout.append(p)
-    return fout
+            invalid.append(p)
+    return invalid

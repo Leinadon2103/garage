@@ -1,4 +1,4 @@
-"""Gedeelde webhulpmiddelen: templates, validatie van invoer en uploads, bestanden opruimen."""
+"""Shared web helpers: templates, validating input and uploads, cleaning up files."""
 import io
 import logging
 import re
@@ -12,140 +12,141 @@ from markupsafe import Markup
 
 from . import db
 
-lazy from . import export_pdf  # reportlab/pypdf pas laden bij de eerste upload of export (sneller opstarten)
+lazy from . import export_pdf  # load reportlab/pypdf only at the first upload or export (faster startup)
 
-HIER = Path(__file__).resolve().parent
-# extensie -> (mime-type, eerste bytes van het bestand)
-TOEGESTAAN = {
+HERE = Path(__file__).resolve().parent
+# extension -> (mime type, first bytes of the file)
+ALLOWED = {
     ".pdf": ("application/pdf", b"%PDF"),
     ".jpg": ("image/jpeg", b"\xff\xd8\xff"),
     ".jpeg": ("image/jpeg", b"\xff\xd8\xff"),
     ".png": ("image/png", b"\x89PNG"),
 }
-VOERTUIGSOORTEN = ["Motorfiets", "Bromfiets", "Personenauto", "Bedrijfsauto", "Aanhangwagen", "Overig"]
+# shown in the app and used by the RDW, so Dutch
+VEHICLE_TYPES = ["Motorfiets", "Bromfiets", "Personenauto", "Bedrijfsauto", "Aanhangwagen", "Overig"]
 
 
-def euro(bedrag) -> str:
-    return "" if bedrag is None else f"€ {bedrag:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+def euro(amount) -> str:
+    return "" if amount is None else f"€ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-templates = Jinja2Templates(directory=HIER / "templates")
+templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.filters["km"] = lambda v: "" if v is None else f"{v:,}".replace(",", ".")
 templates.env.filters["euro"] = euro
-templates.env.filters["nl_datum"] = lambda d: (date.fromisoformat(d) if isinstance(d, str) else d).strftime("%d-%m-%Y") if d else ""
-templates.env.globals["icon"] = lambda naam, klasse="": Markup(  # format() escapet naam en klasse
-    '<svg class="i {}" aria-hidden="true"><use href="/static/icons.svg#i-{}"/></svg>').format(klasse, naam)
-# bestandsnaam in de url: een nieuw beeld = een nieuwe url, dus de browser toont nooit een oude kopie uit zijn cache
-templates.env.globals["beeld_url"] = lambda v: f"/voertuigen/{v['id']}/beeld.jpg?v={Path(v['beeld_pad']).stem}"
-templates.env.globals["soort_icoon"] = {"Motorfiets": "bike", "Bromfiets": "bike", "Personenauto": "car",
-                                        "Bedrijfsauto": "truck", "Aanhangwagen": "truck"}
+templates.env.filters["nl_date"] = lambda d: (date.fromisoformat(d) if isinstance(d, str) else d).strftime("%d-%m-%Y") if d else ""
+templates.env.globals["icon"] = lambda name, cls="": Markup(  # format() escapes name and cls
+    '<svg class="i {}" aria-hidden="true"><use href="/static/icons.svg#i-{}"/></svg>').format(cls, name)
+# file name in the url: a new image = a new url, so the browser never shows an old copy from its cache
+templates.env.globals["image_url"] = lambda v: f"/vehicles/{v['id']}/image.jpg?v={Path(v['image_path']).stem}"
+templates.env.globals["type_icon"] = {"Motorfiets": "bike", "Bromfiets": "bike", "Personenauto": "car",
+                                      "Bedrijfsauto": "truck", "Aanhangwagen": "truck"}
 
 
-def kenteken_opmaak(k: str) -> str:
-    """'00MDB8' -> '00-MDB-8'; streepjes tussen letter- en cijfergroepen zoals op de NL-plaat."""
-    groepen = re.findall(r"[A-Z]+|\d+", k or "")
-    if len(groepen) == 2 and len(k) == 6:  # bijv. 99-XX-XX of XX-XX-99
-        groepen = [g[i:i + 2] for g in groepen for i in range(0, len(g), 2)]
-    return "-".join(groepen) if 2 <= len(groepen) <= 3 else k
+def format_plate(plate: str) -> str:
+    """'00MDB8' -> '00-MDB-8'; dashes between letter and digit groups, as on the Dutch plate."""
+    groups = re.findall(r"[A-Z]+|\d+", plate or "")
+    if len(groups) == 2 and len(plate) == 6:  # e.g. 99-XX-XX or XX-XX-99
+        groups = [g[i:i + 2] for g in groups for i in range(0, len(g), 2)]
+    return "-".join(groups) if 2 <= len(groups) <= 3 else plate
 
 
-templates.env.filters["plaat"] = kenteken_opmaak
-MAANDEN = "jan feb mrt apr mei jun jul aug sep okt nov dec".split()
-templates.env.filters["kort_datum"] = lambda d: (lambda x: f"{x.day} {MAANDEN[x.month - 1]} {x.year}")(
+templates.env.filters["plate"] = format_plate
+MONTHS = "jan feb mrt apr mei jun jul aug sep okt nov dec".split()
+templates.env.filters["short_date"] = lambda d: (lambda x: f"{x.day} {MONTHS[x.month - 1]} {x.year}")(
     date.fromisoformat(d) if isinstance(d, str) else d) if d else ""
 
 
-def render(request: Request, naam: str, status_code: int = 200, **ctx):
+def render(request: Request, name: str, status_code: int = 200, **ctx):
     try:
         with db.connect() as conn:
-            thema = db.instelling(conn, "thema", "systeem")
-            ctx.setdefault("thema", thema if thema in ("licht", "donker", "systeem") else "systeem")
-    except Exception:  # noqa: BLE001 - bijv. database op slot: gewoon de standaardweergave
-        ctx.setdefault("thema", "systeem")
-    return templates.TemplateResponse(request, naam, ctx, status_code=status_code)
+            theme = db.setting(conn, "theme", "system")
+            ctx.setdefault("theme", theme if theme in ("light", "dark", "system") else "system")
+    except Exception:  # noqa: BLE001 - e.g. database locked: just the default look
+        ctx.setdefault("theme", "system")
+    return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
 
-def terug(url: str) -> RedirectResponse:
+def redirect(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
 
-TABELLEN = {"voertuig", "beurt", "factuur", "document", "km_stand", "stalling"}
+TABLES = {"vehicle", "service", "invoice", "document", "odometer_reading", "storage_period"}
 
 
-def haal(conn, tabel: str, id_: int):
-    if tabel not in TABELLEN:  # tabelnaam kan geen ?-parameter zijn; daarom alleen vaste namen
-        raise ValueError(f"Onbekende tabel: {tabel}")
-    rij = conn.execute(f"SELECT * FROM {tabel} WHERE id = ?", (id_,)).fetchone()  # nosec B608
-    if not rij:
-        raise HTTPException(404, f"{tabel} niet gevonden")
-    return rij
+def fetch(conn, table: str, id_: int):
+    if table not in TABLES:  # a table name cannot be a ?-parameter; so only fixed names
+        raise ValueError(f"Unknown table: {table}")
+    row = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (id_,)).fetchone()  # nosec B608
+    if not row:
+        raise HTTPException(404, "Niet gevonden")
+    return row
 
 
-def mime_voor(pad: Path) -> str:
-    """Mime-type uit de extensie, nooit uit de database: een teruggezette back-up kan daar bijv. text/html in
-    zetten, en dan zou een 'factuur' als webpagina binnen Garage draaien."""
-    if pad.suffix.lower() not in TOEGESTAAN:
+def mime_for(path: Path) -> str:
+    """Mime type from the extension, never from the database: a restored backup could put e.g. text/html there,
+    and then an 'invoice' would run as a web page inside Garage."""
+    if path.suffix.lower() not in ALLOWED:
         raise HTTPException(404, "Onbekend bestandstype")
-    return TOEGESTAAN[pad.suffix.lower()][0]
+    return ALLOWED[path.suffix.lower()][0]
 
 
-def getal(waarde: str | None) -> int | None:
-    """'12.000' of '12000' -> 12000; leeg -> None; anders ValueError."""
-    waarde = (waarde or "").strip().replace(".", "").replace(" ", "")
-    if not waarde:
+def parse_int(value: str | None) -> int | None:
+    """'12.000' or '12000' -> 12000; empty -> None; otherwise ValueError."""
+    value = (value or "").strip().replace(".", "").replace(" ", "")
+    if not value:
         return None
-    if not waarde.isdigit():
-        raise ValueError(f"'{waarde}' is geen geldig getal.")
-    return int(waarde)
+    if not value.isdigit():
+        raise ValueError(f"'{value}' is geen geldig getal.")
+    return int(value)
 
 
-def bedrag(waarde: str | None) -> float | None:
-    """Accepteert o.a. '45,50', '€ 1.250,00' en '45.50'; leeg -> None; anders ValueError."""
-    waarde = (waarde or "").replace("€", "").replace(" ", "").strip()
-    if not waarde:
+def parse_amount(value: str | None) -> float | None:
+    """Accepts e.g. '45,50', '€ 1.250,00' and '45.50'; empty -> None; otherwise ValueError."""
+    value = (value or "").replace("€", "").replace(" ", "").strip()
+    if not value:
         return None
-    if "," in waarde:  # Nederlandse notatie: punt = duizendtal, komma = decimaal
-        waarde = waarde.replace(".", "").replace(",", ".")
+    if "," in value:  # Dutch notation: dot = thousands, comma = decimals
+        value = value.replace(".", "").replace(",", ".")
     try:
-        return round(float(waarde), 2)
+        return round(float(value), 2)
     except ValueError:
-        raise ValueError(f"'{waarde}' is geen geldig bedrag.")
+        raise ValueError(f"'{value}' is geen geldig bedrag.")
 
 
-def _of_400(parser, waarde):
+def or_400(parser, value):
     try:
-        return parser(waarde)
+        return parser(value)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
 
-def verwijder_bestanden(paden) -> None:
-    for pad in filter(None, paden):
+def delete_files(paths) -> None:
+    for path in filter(None, paths):
         try:
-            db.bestand(pad).unlink(missing_ok=True)
-        except (OSError, ValueError):  # bijv. bestand nog open in een PDF-viewer; database is al bijgewerkt
-            logging.warning("Kon %s niet verwijderen", pad)
+            db.data_file(path).unlink(missing_ok=True)
+        except (OSError, ValueError):  # e.g. file still open in a PDF viewer; the database is already updated
+            logging.warning("Could not delete %s", path)
 
 
-def factuur_paden(rijen) -> list[str]:
-    return [p for f in rijen for p in (f["pad"], f["origineel_pad"])]
+def invoice_paths(rows) -> list[str]:
+    return [p for f in rows for p in (f["path"], f["original_path"])]
 
 
-async def lees_uploads(bestanden: list[UploadFile]) -> list[tuple[str, str, bytes]]:
-    """Valideert uploads; geeft (originele naam, extensie, inhoud). Lege bestandsvelden worden genegeerd."""
+async def read_uploads(files: list[UploadFile]) -> list[tuple[str, str, bytes]]:
+    """Validates uploads; returns (original name, extension, content). Empty file fields are ignored."""
     result = []
-    for f in bestanden:
+    for f in files:
         if not f.filename:
             continue
         ext = Path(f.filename).suffix.lower()
-        inhoud = await f.read()
-        if ext not in TOEGESTAAN or not inhoud.startswith(TOEGESTAAN[ext][1]):
+        content = await f.read()
+        if ext not in ALLOWED or not content.startswith(ALLOWED[ext][1]):
             raise ValueError(f"'{f.filename}' is geen geldige PDF, JPG of PNG.")
         if ext == ".pdf":
             try:
-                export_pdf.lees_pdf(io.BytesIO(inhoud))
-            except Exception as e:  # noqa: BLE001 - pypdf gooit uiteenlopende fouten
-                reden = str(e) if isinstance(e, ValueError) else "bestand is beschadigd"
-                raise ValueError(f"'{f.filename}' kan niet gebruikt worden: {reden}.")
-        result.append((Path(f.filename).name, ext, inhoud))
+                export_pdf.read_pdf(io.BytesIO(content))
+            except Exception as e:  # noqa: BLE001 - pypdf raises all kinds of errors
+                reason = str(e) if isinstance(e, ValueError) else "bestand is beschadigd"
+                raise ValueError(f"'{f.filename}' kan niet gebruikt worden: {reason}.")
+        result.append((Path(f.filename).name, ext, content))
     return result

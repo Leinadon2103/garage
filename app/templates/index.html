@@ -1,51 +1,51 @@
 {% extends "base.html" %}
-{% block inhoud %}
-<div class="kop">
+{% block content %}
+<div class="header">
   <div>
     <div class="eyebrow">Mijn garage</div>
     <h1>Voertuigen</h1>
   </div>
-  {% if voertuigen %}<a href="/voertuigen/nieuw" class="btn">{{ icon("plus") }} Voertuig toevoegen</a>{% endif %}
+  {% if vehicles %}<a href="/vehicles/new" class="btn">{{ icon("plus") }} Voertuig toevoegen</a>{% endif %}
 </div>
 
-{% if hersteld %}<div class="melding ok">{{ icon("check") }}<p>Back-up teruggezet. Je vorige gegevens staan veilig in {{ hersteld }}.</p></div>{% endif %}
-{% if voertuigen and (backup.te_oud or backup.fout) %}
-<div class="melding warn banner">{{ icon("hard-drive-download") }}
-  <p>{% if backup.fout %}De laatste automatische back-up is mislukt.{% elif backup.laatste %}Je laatste back-up is van {{ backup.laatste.strftime("%d-%m-%Y") }}.{% else %}Je hebt nog geen back-up van je gegevens.{% endif %}
+{% if restored %}<div class="notice ok">{{ icon("check") }}<p>Back-up teruggezet. Je vorige gegevens staan veilig in {{ restored }}.</p></div>{% endif %}
+{% if vehicles and (backup.too_old or backup.error) %}
+<div class="notice warn banner">{{ icon("hard-drive-download") }}
+  <p>{% if backup.error %}De laatste automatische back-up is mislukt.{% elif backup.last %}Je laatste back-up is van {{ backup.last.strftime("%d-%m-%Y") }}.{% else %}Je hebt nog geen back-up van je gegevens.{% endif %}
     Raak je je pc kwijt, dan ben je je historie en facturen kwijt.</p>
-  <form method="post" action="/backup/nu"><button class="btn klein">Nu back-up maken</button></form></div>
+  <form method="post" action="/backup/now"><button class="btn small">Nu back-up maken</button></form></div>
 {% endif %}
 
-{% if not voertuigen %}
-<div class="card leeg">
+{% if not vehicles %}
+<div class="card empty">
   {{ icon("wrench") }}
   <h2>Je garage is nog leeg</h2>
   <p class="muted">Voeg je eerste voertuig toe met het kenteken. De gegevens worden bij de RDW opgezocht.</p>
-  <a href="/voertuigen/nieuw" class="btn">{{ icon("plus") }} Voertuig toevoegen</a>
+  <a href="/vehicles/new" class="btn">{{ icon("plus") }} Voertuig toevoegen</a>
 </div>
 {% else %}
 <div class="garage">
-  {% for v in voertuigen %}
-  <a href="/voertuigen/{{ v.id }}" class="voertuigkaart">
-    <div class="beeld">
-      {% if v.beeld_pad %}<img src="{{ beeld_url(v) }}" alt="" loading="lazy">
-      {% else %}{{ icon(soort_icoon.get(v.voertuigsoort, "car")) }}{% endif %}
-      {% if v.in_stalling %}<span class="chip">{{ icon("snowflake") }} In stalling</span>
-      {% elif aandacht[v.id] %}<span class="chip bad">{{ icon("triangle-alert") }} {{ aandacht[v.id] }} aandachtspunt{{ "en" if aandacht[v.id] > 1 }}</span>
-      {% elif v.aantal %}<span class="chip ok">{{ icon("check") }} Op orde</span>{% endif %}
+  {% for v in vehicles %}
+  <a href="/vehicles/{{ v.id }}" class="vehicle-card">
+    <div class="image">
+      {% if v.image_path %}<img src="{{ image_url(v) }}" alt="" loading="lazy">
+      {% else %}{{ icon(type_icon.get(v.vehicle_type, "car")) }}{% endif %}
+      {% if v.in_storage %}<span class="chip">{{ icon("snowflake") }} In stalling</span>
+      {% elif attention[v.id] %}<span class="chip bad">{{ icon("triangle-alert") }} {{ attention[v.id] }} aandachtspunt{{ "en" if attention[v.id] > 1 }}</span>
+      {% elif v.service_count %}<span class="chip ok">{{ icon("check") }} Op orde</span>{% endif %}
     </div>
     <div class="info">
-      <h3>{{ v.bijnaam or (v.merk ~ " " ~ v.model) }}</h3>
-      <span class="kenteken"><span>{{ v.kenteken|plaat }}</span></span>
+      <h3>{{ v.nickname or (v.make ~ " " ~ v.model) }}</h3>
+      <span class="plate"><span>{{ v.license_plate|plate }}</span></span>
       <div class="meta">
         <span>{{ icon("gauge") }} {{ (v.km|km ~ " km") if v.km else "–" }}</span>
-        <span>{{ icon("wrench") }} {{ v.aantal }} beurt{{ "en" if v.aantal != 1 }}</span>
-        {% if v.laatste %}<span>{{ icon("calendar") }} {{ v.laatste|kort_datum }}</span>{% endif %}
+        <span>{{ icon("wrench") }} {{ v.service_count }} beurt{{ "en" if v.service_count != 1 }}</span>
+        {% if v.last_service %}<span>{{ icon("calendar") }} {{ v.last_service|short_date }}</span>{% endif %}
       </div>
     </div>
   </a>
   {% endfor %}
-  <a href="/voertuigen/nieuw" class="nieuwkaart"><div>{{ icon("plus") }}<br>Voertuig toevoegen</div></a>
+  <a href="/vehicles/new" class="new-card"><div>{{ icon("plus") }}<br>Voertuig toevoegen</div></a>
 </div>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Persoonsgegevens weglakken{% endblock %}
+{% block content %}
+<a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
+<div class="header">
+  <div><div class="eyebrow">Privacy</div><h1>Persoonsgegevens weglakken</h1>
+    <p class="muted">{{ f.original_filename }}{% if remaining %} · daarna nog {{ remaining }} factu{{ "ren" if remaining > 1 else "ur" }}{% endif %}</p></div>
+</div>
+
+<div class="redact-layout">
+  <div id="pages">
+    {% for nr in range(pages) %}
+    <div class="redact-page" data-page="{{ nr }}"><img src="/invoices/{{ f.id }}/page/{{ nr }}.png" alt="Pagina {{ nr + 1 }}" draggable="false"></div>
+    {% endfor %}
+  </div>
+
+  <aside class="redact-sidebar card">
+    <h3>Hoe werkt het?</h3>
+    <div class="legend">
+      <span><i class="on"></i> Wordt weggelakt</span>
+      <span><i class="off"></i> Suggestie, staat uit</span>
+      <span>{{ icon("scan-line") }} Sleep over de factuur om zelf een balk te tekenen</span>
+      <span>{{ icon("x") }} Klik op een balk om hem aan/uit te zetten. Een zelf getekende balk verdwijnt dan.</span>
+    </div>
+    {% if f.mime_type != "application/pdf" %}
+    <div class="notice warn">{{ icon("triangle-alert") }}<p>Bij foto's kan de app geen tekst herkennen. Teken de balken zelf. Locatiegegevens (EXIF) worden wel automatisch verwijderd.</p></div>
+    {% elif not suggestions %}
+    <div class="notice warn">{{ icon("triangle-alert") }}<p>Geen suggesties gevonden. Is dit een scan? Teken de balken dan zelf.</p></div>
+    {% endif %}
+    {% if not has_terms %}
+    <p class="muted" style="font-size:.85rem">{{ icon("sparkles") }} Tip: zet je naam en adres bij <a href="/settings#private">Instellingen</a>. Dan worden ze voortaan altijd automatisch gevonden.</p>
+    {% endif %}
+    <p class="muted" style="font-size:.85rem">De tekst onder de balken wordt echt uit het bestand verwijderd. Het origineel blijft alleen voor jou bewaard.</p>
+    <form method="post" id="redact-form">
+      <input type="hidden" name="redactions" id="redactions">
+      <button type="submit" class="btn" style="width:100%">{{ icon("shield-check") }} <span id="button-text">Opslaan</span></button>
+    </form>
+    <a href="/vehicles/{{ v.id }}" class="btn ghost" style="width:100%;margin-top:10px">Later doen</a>
+  </aside>
+</div>
+
+<script>
+  const boxes = {{ suggestions|tojson }};  // {page, x0, y0, x1, y1 (fractions), reason, active}
+  const pages = [...document.querySelectorAll(".redact-page")];
+  const OWN = "eigen";  // reason of a box drawn by the user (shown in the app)
+
+  function draw() {
+    document.querySelectorAll(".box").forEach(b => b.remove());
+    boxes.forEach((b, i) => {
+      const el = document.createElement("div");
+      el.className = "box" + (b.active ? "" : " off");
+      el.dataset.i = i;
+      Object.assign(el.style, {left: b.x0 * 100 + "%", top: b.y0 * 100 + "%",
+                               width: (b.x1 - b.x0) * 100 + "%", height: (b.y1 - b.y0) * 100 + "%"});
+      if (b.reason) el.innerHTML = `<span class="reason">${b.reason}</span>`;
+      pages[b.page].appendChild(el);
+    });
+    const n = boxes.filter(b => b.active).length;
+    document.getElementById("button-text").textContent = n ? `${n} balk${n > 1 ? "en" : ""} toepassen en opslaan` : "Niets weglakken, opslaan";
+  }
+
+  // dragging = draw a new box (also on top of a suggestion); a short click on a box = on/off
+  pages.forEach((p, nr) => {
+    let start = null, preview = null, clicked = null;
+    const stop = () => { start = null; clicked = null; if (preview) { preview.remove(); preview = null; } };
+    const pos = e => { const r = p.getBoundingClientRect();
+      return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))]; };
+    p.addEventListener("pointerdown", e => {
+      const box = e.target.closest(".box");
+      clicked = box ? +box.dataset.i : null;
+      start = pos(e); p.setPointerCapture(e.pointerId);
+      preview = document.createElement("div"); preview.className = "box drawing"; p.appendChild(preview);
+    });
+    p.addEventListener("pointermove", e => {
+      if (!start) return;
+      const [x, y] = pos(e);
+      Object.assign(preview.style, {left: Math.min(x, start[0]) * 100 + "%", top: Math.min(y, start[1]) * 100 + "%",
+        width: Math.abs(x - start[0]) * 100 + "%", height: Math.abs(y - start[1]) * 100 + "%"});
+    });
+    p.addEventListener("pointerup", e => {
+      if (!start) return;
+      const [x, y] = pos(e);
+      if (Math.abs(x - start[0]) > 0.005 && Math.abs(y - start[1]) > 0.003) {
+        boxes.push({page: nr, x0: Math.min(x, start[0]), y0: Math.min(y, start[1]), x1: Math.max(x, start[0]),
+                    y1: Math.max(y, start[1]), reason: OWN, active: true});
+      } else if (clicked !== null) {
+        const b = boxes[clicked];
+        if (b.reason === OWN) boxes.splice(clicked, 1); else b.active = !b.active;
+      }
+      stop(); draw();
+    });
+    p.addEventListener("pointercancel", stop);
+    p.addEventListener("lostpointercapture", () => { if (start) { stop(); draw(); } });
+  });
+
+  document.getElementById("redact-form").addEventListener("submit", () => {
+    document.getElementById("redactions").value = JSON.stringify(boxes.filter(b => b.active));
+  });
+  draw();
+</script>
+{% endblock %}

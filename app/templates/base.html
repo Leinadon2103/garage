@@ -1,48 +1,48 @@
 <!doctype html>
-<html lang="nl" data-thema="{{ thema or 'systeem' }}">
+<html lang="nl" data-theme="{{ theme or 'system' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block titel %}Garage{% endblock %} · Voertuigonderhoud</title>
+  <title>{% block title %}Garage{% endblock %} · Voertuigonderhoud</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/static/manifest.webmanifest">
   <link rel="stylesheet" href="/static/app.css">
   <script>
-    // Weergave bepalen vóór het tekenen (geen witte flits). Standen: licht, donker, systeem.
+    // Decide the theme before drawing (no white flash). Settings: light, dark, system.
     (() => {
       const html = document.documentElement;
-      const systeemDonker = matchMedia("(prefers-color-scheme: dark)");
-      function moetDonker() {
-        const stand = html.dataset.thema;
-        if (stand === "donker") return true;
-        if (stand === "licht") return false;
-        return systeemDonker.matches;
+      const systemDark = matchMedia("(prefers-color-scheme: dark)");
+      function shouldBeDark() {
+        const setting = html.dataset.theme;
+        if (setting === "dark") return true;
+        if (setting === "light") return false;
+        return systemDark.matches;
       }
-      function titelbalk(donker, vloeiend) {  // alleen in het Garage-programma (pywebview)
-        window.pywebview?.api?.titelbalk?.(donker, vloeiend);
+      function titleBar(dark, smooth) {  // only in the Garage program (pywebview)
+        window.pywebview?.api?.title_bar?.(dark, smooth);
       }
-      function toepassen(vloeiend) {
-        const donker = moetDonker();
-        if (donker === html.hasAttribute("data-donker")) return;
-        if (vloeiend) {
-          html.classList.add("thema-overgang");
-          clearTimeout(toepassen.timer);
-          toepassen.timer = setTimeout(() => html.classList.remove("thema-overgang"), 700);
+      function apply(smooth) {
+        const dark = shouldBeDark();
+        if (dark === html.hasAttribute("data-dark")) return;
+        if (smooth) {
+          html.classList.add("theme-transition");
+          clearTimeout(apply.timer);
+          apply.timer = setTimeout(() => html.classList.remove("theme-transition"), 700);
         }
-        html.toggleAttribute("data-donker", donker);
-        titelbalk(donker, vloeiend);
+        html.toggleAttribute("data-dark", dark);
+        titleBar(dark, smooth);
       }
-      window.garageWeergave = {
-        async kies(stand) {
-          html.dataset.thema = stand;
-          toepassen(true);
-          document.querySelectorAll("[data-stand]").forEach(k => k.setAttribute("aria-pressed", k.dataset.stand === stand));
-          await fetch("/weergave", {method: "POST", body: new URLSearchParams({thema: stand})});
+      window.garageTheme = {
+        async choose(setting) {
+          html.dataset.theme = setting;
+          apply(true);
+          document.querySelectorAll("[data-setting]").forEach(b => b.setAttribute("aria-pressed", b.dataset.setting === setting));
+          await fetch("/theme", {method: "POST", body: new URLSearchParams({theme: setting})});
         },
       };
-      toepassen(false);
-      systeemDonker.addEventListener("change", () => toepassen(true));  // Windows wisselt (bijv. bij zonsondergang)
-      addEventListener("pywebviewready", () => titelbalk(html.hasAttribute("data-donker"), false));
+      apply(false);
+      systemDark.addEventListener("change", () => apply(true));  // Windows switches (e.g. at sunset)
+      addEventListener("pywebviewready", () => titleBar(html.hasAttribute("data-dark"), false));
     })();
   </script>
 </head>
@@ -51,37 +51,38 @@
     <div class="wrap">
       <a href="/" class="logo"><span class="logo-mark">{{ icon("wrench") }}</span> Garage</a>
       <nav class="nav">
-        <a href="/" class="{{ 'actief' if request.url.path == '/' or request.url.path.startswith('/voertuigen') or request.url.path.startswith('/beurt') or request.url.path.startswith('/facturen') or request.url.path.startswith('/documenten') }}" aria-label="Voertuigen">{{ icon("car") }}<span>Voertuigen</span></a>
-        <a href="/instellingen" aria-label="Instellingen" class="{{ 'actief' if request.url.path.startswith('/instellingen') }}">{{ icon("settings") }}<span>Instellingen</span></a>
+        {% set path = request.url.path %}
+        <a href="/" class="{{ 'active' if path == '/' or path.startswith(('/vehicles', '/services', '/invoices', '/documents')) }}" aria-label="Voertuigen">{{ icon("car") }}<span>Voertuigen</span></a>
+        <a href="/settings" aria-label="Instellingen" class="{{ 'active' if path.startswith('/settings') }}">{{ icon("settings") }}<span>Instellingen</span></a>
       </nav>
-      {% set weergave_icoon = {"licht": "sun", "donker": "moon", "systeem": "monitor"} %}
-      <details class="weergave">
-        <summary aria-label="Weergave kiezen" title="Weergave">{{ icon(weergave_icoon.get(thema, "monitor")) }}</summary>
+      {% set theme_icon = {"light": "sun", "dark": "moon", "system": "monitor"} %}
+      <details class="theme-menu">
+        <summary aria-label="Weergave kiezen" title="Weergave">{{ icon(theme_icon.get(theme, "monitor")) }}</summary>
         <div class="menu" role="group" aria-label="Weergave">
-          {% for stand, label in [("licht", "Licht"), ("donker", "Donker"), ("systeem", "Zoals Windows")] %}
-          <button type="button" data-stand="{{ stand }}" aria-pressed="{{ 'true' if stand == thema else 'false' }}"
-                  onclick="garageWeergave.kies('{{ stand }}'); this.closest('details').open = false;
-                           this.closest('details').querySelector('summary use').setAttribute('href', '/static/icons.svg#i-{{ weergave_icoon[stand] }}')">
-            {{ icon(weergave_icoon[stand]) }} {{ label }}</button>
+          {% for setting, label in [("light", "Licht"), ("dark", "Donker"), ("system", "Zoals Windows")] %}
+          <button type="button" data-setting="{{ setting }}" aria-pressed="{{ 'true' if setting == theme else 'false' }}"
+                  onclick="garageTheme.choose('{{ setting }}'); this.closest('details').open = false;
+                           this.closest('details').querySelector('summary use').setAttribute('href', '/static/icons.svg#i-{{ theme_icon[setting] }}')">
+            {{ icon(theme_icon[setting]) }} {{ label }}</button>
           {% endfor %}
         </div>
       </details>
     </div>
   </header>
   <main class="wrap">
-    {% if fout %}<div class="melding fout" role="alert">{{ icon("triangle-alert") }}<p>{{ fout }}</p></div>{% endif %}
-    {% block inhoud %}{% endblock %}
+    {% if error %}<div class="notice error" role="alert">{{ icon("triangle-alert") }}<p>{{ error }}</p></div>{% endif %}
+    {% block content %}{% endblock %}
   </main>
   <div class="tooltip" id="tooltip" role="tooltip"></div>
   <script>
-    // Tooltips voor grafieken: elk element met data-tip (muis en toetsenbord)
+    // Tooltips for charts: every element with data-tip (mouse and keyboard)
     (() => {
       const tip = document.getElementById("tooltip");
-      const toon = (el, x, y) => { tip.textContent = el.dataset.tip; tip.style.left = x + 12 + "px"; tip.style.top = y - 36 + "px"; tip.classList.add("zichtbaar"); };
-      document.addEventListener("mousemove", e => { const el = e.target.closest?.("[data-tip]"); el ? toon(el, e.clientX, e.clientY) : tip.classList.remove("zichtbaar"); });
-      document.addEventListener("focusin", e => { const el = e.target.closest?.("[data-tip]"); if (el) { const r = el.getBoundingClientRect(); toon(el, r.left, r.top); } });
-      document.addEventListener("focusout", () => tip.classList.remove("zichtbaar"));
-      document.addEventListener("click", e => { const d = document.querySelector("details.weergave[open]"); if (d && !d.contains(e.target)) d.open = false; });
+      const show = (el, x, y) => { tip.textContent = el.dataset.tip; tip.style.left = x + 12 + "px"; tip.style.top = y - 36 + "px"; tip.classList.add("visible"); };
+      document.addEventListener("mousemove", e => { const el = e.target.closest?.("[data-tip]"); el ? show(el, e.clientX, e.clientY) : tip.classList.remove("visible"); });
+      document.addEventListener("focusin", e => { const el = e.target.closest?.("[data-tip]"); if (el) { const r = el.getBoundingClientRect(); show(el, r.left, r.top); } });
+      document.addEventListener("focusout", () => tip.classList.remove("visible"));
+      document.addEventListener("click", e => { const d = document.querySelector("details.theme-menu[open]"); if (d && !d.contains(e.target)) d.open = false; });
     })();
   </script>
 </body>

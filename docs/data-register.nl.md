@@ -1,8 +1,10 @@
 # Gegevensregister
 
-Welke gegevens Garage verwerkt, waar ze staan en hoe lang. Dit is het verwerkingsoverzicht achter [PRIVACY.md](../PRIVACY.md) en de basis voor versleuteling (P1), bewaartermijnen (P7) en wissen (P3, P4). De betekenis per tabel en kolom staat in de [datadictionary](datadictionary.md).
+*English: [data-register.md](data-register.md)*
 
-Stand: versie 1.3.0, schemaversie 1. Werk dit bij als er een gegeven, een opslagplek of een bewaartermijn bijkomt.
+Welke gegevens Garage verwerkt, waar ze staan en hoe lang. Dit is het verwerkingsoverzicht achter [PRIVACY.nl.md](../PRIVACY.nl.md) en de basis voor versleuteling (P1), bewaartermijnen (P7) en wissen (P3, P4). De betekenis per tabel en kolom staat in de [datadictionary](data-dictionary.nl.md).
+
+Stand: na versie 1.3.0, schemaversie 2. Werk dit bij als er een gegeven, een opslagplek of een bewaartermijn bijkomt.
 
 ## Opslagplekken
 | Code | Plek | Toelichting |
@@ -41,9 +43,9 @@ Gevoeligheid: **hoog** = direct herleidbaar tot een persoon (naam, adres, contac
 | Documenten (kentekenbewijs, polis, aankoopfactuur, ...) en hun vervaldatum | upload | Naslag, herinnering bij verlopen | **hoog** | doc, db, bak | tot het document of voertuig wordt verwijderd |
 | Voertuigbeeld: eigen foto | upload | Herkenning in de app | middel (kan een huis, persoon of omgeving tonen; EXIF/GPS wordt verwijderd) | bld, bak | tot vervangen of verwijderd |
 | Voertuigbeeld: Sketchfab of Wikimedia, met titel en bronlink | gekozen zoekresultaat | Herkenning, naamsvermelding | laag | bld, db, bak | idem |
-| Eigen lak-termen (naam, adres, ...) | gebruiker | Persoonsgegevens op facturen vinden | **hoog** | db (`instelling`), bak | tot de gebruiker ze aanpast |
+| Eigen lak-termen (naam, adres, ...) | gebruiker | Persoonsgegevens op facturen vinden | **hoog** | db (`setting`), bak | tot de gebruiker ze aanpast |
 | Instellingen (thema, herinneringen, Sketchfab, back-upmap en -status) | gebruiker en app | Werking van de app | laag (de back-upmap bevat de Windows-gebruikersnaam) | db, bak | doorlopend |
-| Administratie van meldingen (`melding_laatst`) | app | Hooguit één melding per dag | laag | db, bak | wordt overschreven |
+| Administratie van meldingen (`last_notification`) | app | Hooguit één melding per dag | laag | db, bak | wordt overschreven |
 | Tekst van herinneringen (voertuignaam + wat er moet gebeuren) | app | Herinnering | laag | win | tot de gebruiker de melding wist |
 | Foutmeldingen | app | Problemen oplossen | laag tot middel (paden met gebruikersnaam, foutteksten) | log | ca. 3 MB, daarna overschreven |
 | OCR-resultaat van een factuur | Windows-OCR | Uitlezen en lak-suggesties | **hoog** | alleen in het geheugen (cache van de laatste afbeeldingen) | tot de app sluit |
@@ -77,6 +79,6 @@ Punten die nog niet in de roadmap stonden of die een bestaand punt aanscherpen:
 
 1. ~~**Verwijderd is niet direct weg uit de database.**~~ Opgelost met P9: `PRAGMA secure_delete = ON` bij elke verbinding, plus eenmalig `VACUUM` voor wat daarvoor al was verwijderd. Kanttekening: oude back-ups bevatten de verwijderde gegevens nog (P3/P7).
 2. ~~**Oorspronkelijke bestandsnaam in de verkoop-PDF.**~~ Opgelost met P10: foutpagina's noemen alleen het bijlagenummer, de datum en het onderhoud.
-3. ~~**Restanten na een crash.**~~ Opgelost met G9: `backup.opruimen()` bij het starten; `.deel`-bestanden bij de automatische back-upcontrole.
+3. ~~**Restanten na een crash.**~~ Opgelost met G9: `backup.clean_up()` bij het starten; `.deel`-bestanden bij de automatische back-upcontrole.
 4. **Meldingencentrum van Windows** bewaart de tekst van herinneringen. Laag risico, maar hoort in de privacytekst.
 5. **Lak-termen staan leesbaar in elke back-up.** Bevestigt de noodzaak van P2.

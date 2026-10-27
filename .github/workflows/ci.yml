@@ -1,12 +1,12 @@
-# Bij elke push naar main en elke pull request: tests, bekende lekken in pakketten en onveilige code.
-# Gelijk aan de controles in bouwen.bat, zonder exe en installatieprogramma.
-# Actions staan vast op een commit (een tag kan worden verplaatst); Dependabot houdt ze bij.
+# On every push to main and every pull request: tests, known vulnerabilities in packages and unsafe code.
+# The same checks as build.bat, without the exe and the installer.
+# Actions are pinned to a commit (a tag can be moved); Dependabot keeps them up to date.
 name: CI
 
 on:
   push:
     branches: [main]
-  pull_request:  # ook Dependabot-PR's
+  pull_request:  # including Dependabot PRs
   workflow_dispatch:
 
 permissions:
@@ -27,15 +27,15 @@ jobs:
 
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
 
-      - name: Pakketten (vaste versies, hashes gecontroleerd)
-        run: python -m pip install -q -r requirements.txt -r requirements-bouwen.txt
+      - name: Packages (pinned versions, hashes checked)
+        run: python -m pip install -q -r requirements.txt -r requirements-build.txt
 
-      - name: Bekende lekken in pakketten (pip-audit)
-        run: pip-audit -r requirements.txt -r requirements-bouwen.txt --require-hashes --disable-pip
+      - name: Known vulnerabilities in packages (pip-audit)
+        run: pip-audit -r requirements.txt -r requirements-build.txt --require-hashes --disable-pip
 
-      # bandit los via uv: pyyaml heeft nog geen wheel voor Python 3.15
-      - name: Onveilige code (bandit)
-        run: uvx --python 3.13 bandit==1.9.4 -q -r app Garage.pyw tools -ll
+      # bandit on Python 3.13 via uv (pyyaml has no wheel for 3.15); the script makes it read lazy imports too
+      - name: Unsafe code (bandit)
+        run: python tools/bandit_scan.py
 
-      - name: Tests (waarschuwingen tellen als fout, zie pytest.ini)
+      - name: Tests (warnings count as errors, see pytest.ini)
         run: python -m pytest -q

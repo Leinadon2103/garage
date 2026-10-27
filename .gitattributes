@@ -1,5 +1,5 @@
-# Regeleinden vastleggen in de repo, los van ieders git-instelling (core.autocrlf): overal LF, zodat werkmap,
-# CI-runner en repo gelijk zijn. Batchbestanden CRLF: cmd leest labels (goto) in een LF-bestand soms verkeerd.
+# Line endings fixed in the repo, independent of everyone's git setting (core.autocrlf): LF everywhere, so the
+# working tree, CI runner and repo are the same. Batch files CRLF: cmd sometimes misreads labels (goto) in an LF file.
 * text=auto eol=lf
 *.bat text eol=crlf
 *.cmd text eol=crlf
