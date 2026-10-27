@@ -1,5 +1,8 @@
 # Wekelijks controleren op nieuwe versies (en beveiligingsupdates) van de vastgelegde pakketten.
 # Dependabot werkt requirements.in bij en genereert requirements.txt opnieuw met pip-compile.
+# Dependabot kent Python 3.15 nog niet en leest de versie uit de kopregel van requirements*.txt. Genereer die
+# bestanden daarom met 3.14 (zelfde versies en hashes; CI test alles op 3.15):
+#   uvx --python 3.14 --from pip-tools pip-compile <opties uit de kopregel> requirements.in
 # De GitHub Actions in .github/workflows staan vast op een commit; Dependabot werkt die ook bij.
 version: 2
 updates:

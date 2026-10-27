@@ -8,7 +8,7 @@ Stand: oktober 2026, na versie 1.3.0. Dit document is de overdracht naar een nie
 - **Git:** Claude commit of pusht niet zelf; wijzigingen klaarzetten, Daniel beslist. Nooit een Co-Authored-By-regel.
 - **Echte gegevens niet lezen:** de app gebruikt `Projecten\Garage-data` (via de omgevingsvariabele `ONDERHOUD_DATA`). Testen gebeurt met `data\` (`start.bat`) of met de pytest-fixtures.
 - **Elke wijziging:** tests erbij, `pytest` groen, en voor een release `bouwen.bat` (pip-audit, bandit via `uvx`, tests, exe, installatieprogramma).
-- **Python 3.15:** de code gebruikt `lazy import` (PEP 810), dus 3.15 is vereist. `pyyaml` heeft nog geen wheel voor 3.15; daarom draait bandit via `uvx --python 3.13`.
+- **Python 3.15:** de code gebruikt `lazy import` (PEP 810), dus 3.15 is vereist. `pyyaml` heeft nog geen wheel voor 3.15; daarom draait bandit via `uvx --python 3.13`. Dependabot kent 3.15 ook nog niet: genereer `requirements*.txt` met `uvx --python 3.14 --from pip-tools pip-compile` (zie `.github/dependabot.yml`).
 
 ## Wat er al is (1.3.0)
 - Lokaal draaiende server (`127.0.0.1`), met een host-check tegen DNS-rebinding, een CSRF-check (`Sec-Fetch-Site`/`Origin`, geen `null`) en beveiligingsheaders. De CSP staat nog `'unsafe-inline'` toe.
