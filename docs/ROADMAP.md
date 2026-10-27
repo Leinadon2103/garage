@@ -10,7 +10,7 @@ Status: October 2026, after version 1.3.0. This document is the handover to a ne
 - **Git:** Claude does not commit or push; prepare the changes, Daniel decides. Never a Co-Authored-By line.
 - **Do not read real data:** the app uses `Projecten\Garage-data` (through the environment variable `GARAGE_DATA`; the old name `ONDERHOUD_DATA` still works). Testing uses `data\` (`start.bat`) or the pytest fixtures.
 - **Every change:** add tests, `pytest` green (warnings count as errors) and CI green; for a release `build.bat` (pip-audit, bandit, tests, exe with self-test, installer).
-- **Python 3.15:** the code uses `lazy import` (PEP 810), so 3.15 is required. `pyyaml` has no wheel for 3.15 yet; so bandit runs on 3.13 via `tools/bandit_scan.py`, which also makes it read `lazy import` (before, bandit silently skipped main.py, web.py and image.py). Dependabot does not know 3.15 yet either: generate `requirements*.txt` with `uvx --python 3.14 --from pip-tools pip-compile` (see `.github/dependabot.yml`).
+- **Python 3.15:** the code uses `lazy import` (PEP 810), so 3.15 is required. `pyyaml` has no wheel for 3.15 yet; so bandit runs on 3.13 via `tools/bandit_scan.py`, which also makes it read `lazy import` (before, bandit silently skipped main.py, web.py and image.py). Dependabot compiles on Linux, so Windows-only packages are listed explicitly in `requirements*.in`. It does not know 3.15 yet either: generate `requirements*.txt` with `uvx --python 3.14 --from pip-tools pip-compile` (see `.github/dependabot.yml`).
 
 ## What exists (1.3.0 and after)
 - Server running locally (`127.0.0.1`), with a host check against DNS rebinding, a CSRF check (`Sec-Fetch-Site`/`Origin`, no `null`) and security headers. The CSP still allows `'unsafe-inline'`.
@@ -91,6 +91,7 @@ Done is ~~struck through~~.
 | **K7** | Rule and test: `app.log` contains no invoice contents or redaction terms | Otherwise log files leak personal data | small |
 | **K8** | License check (e.g. `pip-licenses`) and SBOM in CI | `LICENSES.md` does not go stale unnoticed; AGPL obligations | small |
 | **K9** | Coverage (`pytest-cov`) | See which paths have no test, especially in restoring and migrating | small |
+| **K10** | Evaluate PyMuPDF 2: it pulls in onnxruntime, numpy, pyyaml and more (no Python 3.15 wheels yet, much larger exe). Dependabot ignores it until then (`.github/dependabot.yml`) | Security fixes only land in 2.x at some point | medium |
 
 ## Suggested order
 1. ~~**Foundation:** S2, S3, G1, G2, G3.~~ Done, together with P9, P10, G9 and the conversion to English code.

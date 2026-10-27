@@ -10,6 +10,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # PyMuPDF 2 pulls in onnxruntime, numpy, pyyaml and more, without wheels for Python 3.15 (and a much larger
+      # exe). Evaluate it separately (roadmap K10) before allowing it.
+      - dependency-name: pymupdf
+        versions: [">=2"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

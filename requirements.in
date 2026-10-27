@@ -10,3 +10,10 @@ pymupdf
 pillow
 pywebview
 pytest
+# Windows-only dependencies (of pywebview and click), listed explicitly: Dependabot compiles the lock file on
+# Linux, where they would otherwise drop out and the app would no longer install on Windows.
+pythonnet
+clr-loader
+cffi
+pycparser
+colorama

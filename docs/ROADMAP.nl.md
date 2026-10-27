@@ -10,7 +10,7 @@ Stand: oktober 2026, na versie 1.3.0. Dit document is de overdracht naar een nie
 - **Git:** Claude commit of pusht niet zelf; wijzigingen klaarzetten, Daniel beslist. Nooit een Co-Authored-By-regel.
 - **Echte gegevens niet lezen:** de app gebruikt `Projecten\Garage-data` (via de omgevingsvariabele `GARAGE_DATA`; de oude naam `ONDERHOUD_DATA` werkt nog). Testen gebeurt met `data\` (`start.bat`) of met de pytest-fixtures.
 - **Elke wijziging:** tests erbij, `pytest` groen (waarschuwingen tellen als fout) en CI groen; voor een release `build.bat` (pip-audit, bandit, tests, exe met zelftest, installatieprogramma).
-- **Python 3.15:** de code gebruikt `lazy import` (PEP 810), dus 3.15 is vereist. `pyyaml` heeft nog geen wheel voor 3.15; daarom draait bandit op 3.13 via `tools/bandit_scan.py`, dat bandit ook `lazy import` laat lezen (voorheen sloeg bandit main.py, web.py en image.py stilletjes over). Dependabot kent 3.15 ook nog niet: genereer `requirements*.txt` met `uvx --python 3.14 --from pip-tools pip-compile` (zie `.github/dependabot.yml`).
+- **Python 3.15:** de code gebruikt `lazy import` (PEP 810), dus 3.15 is vereist. `pyyaml` heeft nog geen wheel voor 3.15; daarom draait bandit op 3.13 via `tools/bandit_scan.py`, dat bandit ook `lazy import` laat lezen (voorheen sloeg bandit main.py, web.py en image.py stilletjes over). Dependabot rekent op Linux, dus Windows-pakketten staan expliciet in `requirements*.in`. Het kent 3.15 ook nog niet: genereer `requirements*.txt` met `uvx --python 3.14 --from pip-tools pip-compile` (zie `.github/dependabot.yml`).
 
 ## Wat er al is (1.3.0 en daarna)
 - Lokaal draaiende server (`127.0.0.1`), met een host-check tegen DNS-rebinding, een CSRF-check (`Sec-Fetch-Site`/`Origin`, geen `null`) en beveiligingsheaders. De CSP staat nog `'unsafe-inline'` toe.
@@ -91,6 +91,7 @@ Gedaan staat ~~doorgestreept~~.
 | **K7** | Regel en test: `app.log` bevat geen inhoud van facturen of lak-termen | Logbestanden lekken anders persoonsgegevens | klein |
 | **K8** | Licentiecontrole (bijv. `pip-licenses`) en SBOM in CI | `LICENSES.md` veroudert niet ongemerkt; AGPL-verplichtingen | klein |
 | **K9** | Coverage (`pytest-cov`) | Zien welke paden geen test hebben, vooral bij terugzetten en migreren | klein |
+| **K10** | PyMuPDF 2 beoordelen: trekt onnxruntime, numpy, pyyaml en meer mee (nog geen wheels voor Python 3.15, veel grotere exe). Dependabot slaat het tot die tijd over (`.github/dependabot.yml`) | Beveiligingsfixes komen op termijn alleen nog in 2.x | middel |
 
 ## Voorgestelde volgorde
 1. ~~**Fundament:** S2, S3, G1, G2, G3.~~ Gedaan, met P9, P10, G9 en de omzetting naar Engelse code.

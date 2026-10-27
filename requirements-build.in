@@ -1,3 +1,6 @@
 -c requirements.txt
 pyinstaller
 pip-audit
+# Windows-only dependencies of PyInstaller, listed explicitly (Dependabot compiles on Linux, see requirements.in)
+pefile
+pywin32-ctypes
