@@ -1,5 +1,6 @@
 # Wekelijks controleren op nieuwe versies (en beveiligingsupdates) van de vastgelegde pakketten.
 # Dependabot werkt requirements.in bij en genereert requirements.txt opnieuw met pip-compile.
+# De GitHub Actions in .github/workflows staan vast op een commit; Dependabot werkt die ook bij.
 version: 2
 updates:
   - package-ecosystem: pip
@@ -7,3 +8,7 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

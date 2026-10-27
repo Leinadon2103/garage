@@ -247,10 +247,91 @@ def controle() -> None:
         logging.exception("Controle mislukt")
 
 
+def zelftest(verslag: Path | None = None) -> bool:
+    """'Garage.exe --zelftest [verslag.txt]' (bouwen.bat): start de server met lege gegevens in een tijdelijke map,
+    doorloopt de belangrijkste schermen (ook die met PDF's, afbeeldingen en OCR) en stopt. Vangt fouten die alleen
+    in de gebouwde exe optreden, zoals een ontbrekende module of een weggelaten Pillow-onderdeel.
+    Geen venster, en de echte gegevens worden niet aangeraakt."""
+    import tempfile
+    import traceback
+    sys.path.insert(0, str(HIER))
+    regels = []
+    with tempfile.TemporaryDirectory(prefix="garage-zelftest-", ignore_cleanup_errors=True) as tmp:
+        try:
+            from app import db
+            oude_map, db.DATA_DIR = db.DATA_DIR, Path(tmp).resolve()  # zoals db.DATA_DIR zelf (geen 8.3-pad)
+            try:
+                db.init()
+                with db.connect() as conn:
+                    db.zet_instelling(conn, "backup_auto", "uit")  # nooit een back-up naar de echte back-upmap
+                    olie = next(t["id"] for t in db.types_voor(conn, "Motorfiets") if t["naam"] == "Olie vervangen")
+                server, draad = start_server(vrije_poort())
+                try:
+                    _zelftest_stappen(f"http://127.0.0.1:{server.config.port}", olie, regels)
+                finally:
+                    server.should_exit = True
+                    draad.join(timeout=10)
+            finally:
+                db.DATA_DIR = oude_map
+            gelukt = True
+        except Exception:  # noqa: BLE001 - elke fout hoort in het verslag
+            regels.append("FOUT " + traceback.format_exc())
+            gelukt = False
+    if verslag:
+        verslag.write_text("\n".join(regels + ["Zelftest " + ("geslaagd" if gelukt else "MISLUKT")]), encoding="utf-8")
+    return gelukt
+
+
+def _zelftest_stappen(basis: str, olie: int, regels: list[str]) -> None:
+    import io
+    import json
+    import httpx
+    import pymupdf
+    from PIL import Image
+
+    def stap(omschrijving: str, r: httpx.Response, status: int = 200) -> httpx.Response:
+        if r.status_code != status:
+            raise RuntimeError(f"{omschrijving}: status {r.status_code}, verwacht {status}\n{r.text[:1000]}")
+        regels.append(f"OK   {omschrijving}")
+        return r
+
+    pdf = pymupdf.open()
+    pdf.new_page().insert_text((72, 72), "Factuur zelftest")
+    buf = io.BytesIO()
+    Image.new("RGB", (800, 600), "white").save(buf, "JPEG")
+    jpg = buf.getvalue()
+    facturen = [("facturen", ("factuur.pdf", pdf.tobytes(), "application/pdf")),
+                ("facturen", ("factuur.jpg", jpg, "image/jpeg"))]
+
+    with httpx.Client(base_url=basis, timeout=120) as c:
+        for pad in ("/gezond", "/", "/instellingen", "/voertuigen/nieuw", "/static/app.css"):
+            stap(f"GET {pad}", c.get(pad))
+        v = stap("voertuig toevoegen", c.post("/voertuigen", data={
+            "kenteken": "ZT-01-ST", "voertuigsoort": "Motorfiets", "merk": "Test"}), 303).headers["location"]
+        for sub in ("", "/kosten", "/documenten", "/specificaties", "/stalling", "/intervallen"):
+            stap(f"GET {v}{sub}", c.get(v + sub))
+        stap("factuur uitlezen (OCR)", c.post(f"{v}/factuur-uitlezen", files=facturen))
+        lakken = stap("beurt met facturen opslaan", c.post(f"{v}/beurt/nieuw", files=facturen, data={
+            "datum": "2026-01-15", "kilometerstand": "12000", "types": [str(olie)]}), 303).headers["location"]
+        for _ in facturen:
+            factuur = stap("naar de volgende factuur", c.get(lakken), 303).headers["location"]
+            stap(f"GET {factuur}", c.get(factuur))
+            stap("pagina als afbeelding", c.get(factuur.replace("/lakken", "/pagina/0.png")))
+            balk = [{"pagina": 0, "x0": 0.1, "y0": 0.1, "x1": 0.4, "y1": 0.2}]
+            stap("weglakken", c.post(factuur, data={"boxen": json.dumps(balk)}), 303)
+        if not stap("verkoop-PDF", c.get(f"{v}/export.pdf")).content.startswith(b"%PDF"):
+            raise RuntimeError("verkoop-PDF is geen PDF")
+        stap("eigen foto opslaan", c.post(f"{v}/beeld/upload", files={"foto": ("foto.jpg", jpg, "image/jpeg")}), 303)
+        stap("foto tonen", c.get(f"{v}/beeld.jpg"))
+
+
 def main() -> None:
     if "--controle" in sys.argv:
         controle()
         return
+    if "--zelftest" in sys.argv:
+        rest = sys.argv[sys.argv.index("--zelftest") + 1:]
+        sys.exit(0 if zelftest(Path(rest[0]) if rest else None) else 1)
     if al_open():
         return
     data = data_map()
@@ -260,7 +341,9 @@ def main() -> None:
     sys.path.insert(0, str(HIER))
     try:
         import webview
-        from app import db
+        from app import backup, db
+        backup.opruimen()
+        db.init()  # hier al, zodat een fout (bijv. gegevens van een nieuwere versie) in de melding komt
         server, draad = start_server(vrije_poort())
         with db.connect() as conn:
             donker = start_donker(db.instelling(conn, "thema", "systeem"))

@@ -24,6 +24,7 @@ HIER = Path(__file__).resolve().parent
 
 @asynccontextmanager
 async def lifespan(_app):
+    backup.opruimen()  # vóór init: een afgebroken terugzetting zet ook de database terug
     db.init()
     # automatische back-up op de achtergrond: het opstarten wacht er niet op
     threading.Thread(target=backup.automatisch, daemon=True).start()

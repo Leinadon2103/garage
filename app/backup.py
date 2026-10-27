@@ -83,12 +83,7 @@ def maak(map_: Path | None = None, voorvoegsel: str = VOORVOEGSEL, behalve: Path
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 kopie = Path(tmp) / "onderhoud.db"
-                bron, doel = sqlite3.connect(db.DATA_DIR / "onderhoud.db"), sqlite3.connect(kopie)
-                try:
-                    bron.backup(doel)  # consistente kopie, ook als de app tegelijk schrijft
-                finally:
-                    bron.close()
-                    doel.close()
+                _kopieer_db(db.DATA_DIR / "onderhoud.db", kopie)  # consistente kopie, ook als de app tegelijk schrijft
                 with zipfile.ZipFile(deel, "w", zipfile.ZIP_DEFLATED) as z:
                     z.write(kopie, "onderhoud.db")
                     for sub in MAPPEN:
@@ -127,6 +122,8 @@ def _veilige_naam(naam: str) -> bool:
 def _controleer_database(pad: Path) -> None:
     test = sqlite3.connect(pad)
     try:
+        if db.schemaversie(test) > db.SCHEMAVERSIE:
+            raise BackupFout("Deze back-up komt van een nieuwere versie van Garage. Installeer eerst de nieuwste versie.")
         ok = test.execute("PRAGMA integrity_check").fetchone()[0] == "ok" and \
             test.execute("SELECT 1 FROM sqlite_master WHERE name = 'voertuig'").fetchone() is not None
         if ok:
@@ -172,16 +169,28 @@ def herstel(zip_pad: Path) -> Path:
                 _wissel(tijdelijk)
             finally:
                 shutil.rmtree(tijdelijk, ignore_errors=True)
-        db.init()  # back-up van een oudere versie: nieuwe tabellen/kolommen toevoegen
         with db.connect() as conn:
             db.zet_instelling(conn, "backup_laatste", datetime.now().isoformat(timespec="seconds"))
         return veiligheid
+
+
+def _kopieer_db(van: Path, naar: Path) -> None:
+    bron, doel = sqlite3.connect(van), sqlite3.connect(naar)
+    try:
+        bron.backup(doel)
+    finally:
+        bron.close()
+        doel.close()
 
 
 def _wissel(nieuw: Path) -> None:
     data = db.DATA_DIR
     with db.connect() as conn:  # deze instellingen horen bij deze pc, niet bij de back-up
         lokaal = {k: db.instelling(conn, k) for k in ("backup_map", "backup_auto", "backup_laatste")}
+    oude_db = nieuw / "oud-onderhoud.db"  # om terug te zetten als het hieronder misgaat
+    _kopieer_db(data / "onderhoud.db", oude_db)
+    # markering voor opruimen() bij een crash: vanaf hier kan de oude stand nodig zijn (met de mappen die er waren)
+    (nieuw / "begonnen").write_text(json.dumps([sub for sub in MAPPEN if (data / sub).exists()]), encoding="utf-8")
     opzij = []
     try:
         for sub in MAPPEN:
@@ -199,23 +208,57 @@ def _wissel(nieuw: Path) -> None:
             if (nieuw / sub).exists():
                 os.replace(nieuw / sub, data / sub)
                 geplaatst.append(sub)
-        bron, doel = sqlite3.connect(nieuw / "onderhoud.db"), sqlite3.connect(data / "onderhoud.db")
-        try:
-            bron.backup(doel)
-        finally:
-            bron.close()
-            doel.close()
+        _kopieer_db(nieuw / "onderhoud.db", data / "onderhoud.db")
+        db.init()  # back-up van een oudere versie: eerst migreren
         with db.connect() as conn:
             for k, v in lokaal.items():
                 db.zet_instelling(conn, k, v or "")
     except Exception as e:
+        _kopieer_db(oude_db, data / "onderhoud.db")
         for sub in geplaatst:
             shutil.rmtree(data / sub, ignore_errors=True)
         for sub in opzij:
             os.replace(data / f".oud-{sub}", data / sub)
         raise BackupFout(f"Terugzetten mislukt; je oude gegevens zijn teruggezet. ({e})") from e
+    (nieuw / "klaar").touch()  # de nieuwe stand is compleet; de oude mappen mogen weg
     for sub in opzij:
         shutil.rmtree(data / f".oud-{sub}", ignore_errors=True)
+
+
+def opruimen() -> None:
+    """Bij het starten, vóór db.init(): restanten van een afgebroken terugzetting opruimen. Die bevatten volledige
+    kopieën van de gegevens (ook originele facturen). Is het terugzetten halverwege afgebroken, dan eerst de oude
+    stand terugzetten: de map .oud-facturen kan dan de enige kopie zijn. Een fout hier mag het starten niet tegenhouden."""
+    data, tijdelijk = db.DATA_DIR, db.DATA_DIR / ".herstel-tmp"
+    with _SLOT:
+        try:
+            if (tijdelijk / "begonnen").exists() and not (tijdelijk / "klaar").exists():
+                bestond = json.loads((tijdelijk / "begonnen").read_text(encoding="utf-8"))
+                _kopieer_db(tijdelijk / "oud-onderhoud.db", data / "onderhoud.db")
+                for sub in MAPPEN:
+                    if (data / f".oud-{sub}").exists():
+                        shutil.rmtree(data / sub, ignore_errors=True)
+                        os.replace(data / f".oud-{sub}", data / sub)
+                    elif sub not in bestond:  # alleen uit de back-up geplaatst
+                        shutil.rmtree(data / sub, ignore_errors=True)
+                logging.warning("Afgebroken terugzetting gevonden: de stand van daarvoor is teruggezet")
+            for sub in MAPPEN:
+                oud = data / f".oud-{sub}"
+                if oud.exists() and not (data / sub).exists():  # zonder markering (van vóór 1.4): nooit iets weggooien
+                    os.replace(oud, data / sub)
+                shutil.rmtree(oud, ignore_errors=True)
+            shutil.rmtree(tijdelijk, ignore_errors=True)
+        except Exception:  # noqa: BLE001 - de restanten blijven staan; volgende start opnieuw proberen
+            logging.exception("Restanten van een terugzetting opruimen mislukt")
+
+
+def _halve_back_ups_weg(map_: Path) -> None:
+    """'.deel'-bestanden van een back-up die is afgebroken (bijv. pc uitgezet tijdens het inpakken)."""
+    for deel in [*map_.glob(f"{VOORVOEGSEL}*.zip.deel"), *map_.glob(f"{VEILIGHEID}*.zip.deel")]:
+        try:
+            deel.unlink()
+        except OSError:
+            logging.warning("Halve back-up %s kon niet worden verwijderd", deel.name)
 
 
 def status(conn) -> dict:
@@ -235,12 +278,15 @@ def status(conn) -> dict:
 def automatisch() -> None:
     """Bij het starten: back-up maken als de laatste ouder is dan INTERVAL_DAGEN. Fouten alleen vastleggen."""
     try:
-        with db.connect() as conn:
-            if db.instelling(conn, "backup_auto", "aan") != "aan":
-                return
+        with db.connect() as conn:  # stand bij het starten in één keer uitlezen
+            map_ = doelmap(conn)
+            auto = db.instelling(conn, "backup_auto", "aan") == "aan"
             laatste = db.instelling(conn, "backup_laatste")
             heeft_gegevens = conn.execute("SELECT 1 FROM voertuig LIMIT 1").fetchone()
-        if not heeft_gegevens or (laatste and datetime.now() - datetime.fromisoformat(laatste) < timedelta(days=INTERVAL_DAGEN)):
+        with _SLOT:  # nooit het .deel-bestand van een back-up die nu loopt
+            if map_.is_dir():
+                _halve_back_ups_weg(map_)
+        if not auto or not heeft_gegevens or (laatste and datetime.now() - datetime.fromisoformat(laatste) < timedelta(days=INTERVAL_DAGEN)):
             return
         maak()
         logging.info("Automatische back-up gemaakt")

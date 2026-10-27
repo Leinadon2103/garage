@@ -1,0 +1,41 @@
+# Bij elke push naar main en elke pull request: tests, bekende lekken in pakketten en onveilige code.
+# Gelijk aan de controles in bouwen.bat, zonder exe en installatieprogramma.
+# Actions staan vast op een commit (een tag kan worden verplaatst); Dependabot houdt ze bij.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:  # ook Dependabot-PR's
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controle:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.15"  # lazy import (PEP 810)
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+
+      - name: Pakketten (vaste versies, hashes gecontroleerd)
+        run: python -m pip install -q -r requirements.txt -r requirements-bouwen.txt
+
+      - name: Bekende lekken in pakketten (pip-audit)
+        run: pip-audit -r requirements.txt -r requirements-bouwen.txt --require-hashes --disable-pip
+
+      # bandit los via uv: pyyaml heeft nog geen wheel voor Python 3.15
+      - name: Onveilige code (bandit)
+        run: uvx --python 3.13 bandit==1.9.4 -q -r app Garage.pyw tools -ll
+
+      - name: Tests (waarschuwingen tellen als fout, zie pytest.ini)
+        run: python -m pytest -q

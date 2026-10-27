@@ -4,9 +4,11 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-DATA_DIR = Path(os.environ.get("ONDERHOUD_DATA", Path(__file__).resolve().parent.parent / "data"))
+# resolve(): bestand() geeft opgeloste paden terug; een kort 8.3-pad (DANIEL~1) of koppeling hier zou relative_to() breken
+DATA_DIR = Path(os.environ.get("ONDERHOUD_DATA", Path(__file__).resolve().parent.parent / "data")).resolve()
 
-SCHEMA = """
+# Schema tot en met versie 1.3.0 (migratie 1). Niet meer aanpassen: een wijziging wordt een nieuwe migratie.
+SCHEMA_1 = """
 CREATE TABLE IF NOT EXISTS voertuig (
     id INTEGER PRIMARY KEY,
     kenteken TEXT NOT NULL,
@@ -68,8 +70,8 @@ CREATE TABLE IF NOT EXISTS voertuig_interval (
 );
 """
 
-# Kolommen die later zijn toegevoegd; bestaande databases krijgen ze via init().
-NIEUWE_KOLOMMEN = {
+# Kolommen die vóór de migraties (tot en met 1.3.0) later zijn toegevoegd; migratie 1 vult ze aan in oude databases.
+KOLOMMEN_1 = {
     "voertuig": {
         "beeld_type": "TEXT",    # '3d', 'foto' of 'eigen'
         "beeld_ref": "TEXT",     # Sketchfab-uid bij 3d
@@ -124,6 +126,8 @@ def connect():
     conn = sqlite3.connect(DATA_DIR / "onderhoud.db")
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # verwijderde gegevens met nullen overschrijven; anders blijven ze in vrije pagina's staan (en gaan ze mee in back-ups)
+    conn.execute("PRAGMA secure_delete = ON")
     try:
         with conn:
             yield conn
@@ -131,14 +135,58 @@ def connect():
         conn.close()
 
 
+class SchemaFout(Exception):
+    pass
+
+
+def _migratie_1(conn: sqlite3.Connection) -> None:
+    """Basis: het schema van 1.3.0. Werkt ook op databases van vóór de migraties (user_version 0), die
+    tabellen of later toegevoegde kolommen kunnen missen."""
+    for opdracht in filter(str.strip, SCHEMA_1.split(";")):
+        conn.execute(opdracht)
+    for tabel, kolommen in KOLOMMEN_1.items():
+        bestaand = {r["name"] for r in conn.execute(f"PRAGMA table_info({tabel})")}
+        for kolom, soort in kolommen.items():
+            if kolom not in bestaand:
+                conn.execute(f"ALTER TABLE {tabel} ADD COLUMN {kolom} {soort}")
+
+
+# Migratie n zet de database van versie n-1 naar n (PRAGMA user_version). Alleen achteraan toevoegen, nooit een
+# bestaande migratie wijzigen. Een migratie draait in één transactie; PRAGMA foreign_keys kan daarin niet
+# wisselen, dus een tabel herbouwen gaat met de stappen uit https://sqlite.org/lang_altertable.html.
+MIGRATIES = [_migratie_1]
+SCHEMAVERSIE = len(MIGRATIES)
+
+
+def schemaversie(conn: sqlite3.Connection) -> int:
+    return conn.execute("PRAGMA user_version").fetchone()[0]
+
+
+def migreer(conn: sqlite3.Connection) -> None:
+    """Voert de ontbrekende migraties uit, elk met de nieuwe versie in dezelfde transactie: gaat er iets mis,
+    dan blijft de database op de laatste goede versie staan."""
+    versie = schemaversie(conn)
+    if versie > SCHEMAVERSIE:
+        raise SchemaFout(f"De gegevens zijn van een nieuwere versie van Garage (schema {versie}, deze versie kent "
+                         f"tot {SCHEMAVERSIE}). Installeer de nieuwste versie.")
+    for nummer in range(versie + 1, SCHEMAVERSIE + 1):
+        conn.execute("BEGIN")
+        try:
+            MIGRATIES[nummer - 1](conn)
+            conn.execute(f"PRAGMA user_version = {nummer:d}")
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+
+
 def init() -> None:
     with connect() as conn:
-        conn.executescript(SCHEMA)
-        for tabel, kolommen in NIEUWE_KOLOMMEN.items():
-            bestaand = {r["name"] for r in conn.execute(f"PRAGMA table_info({tabel})")}
-            for kolom, soort in kolommen.items():
-                if kolom not in bestaand:
-                    conn.execute(f"ALTER TABLE {tabel} ADD COLUMN {kolom} {soort}")
+        migreer(conn)
+        if not instelling(conn, "secure_delete_opgeschoond"):
+            # eenmalig: wat vóór secure_delete is verwijderd, staat nog in vrije pagina's; VACUUM herschrijft het bestand
+            conn.execute("VACUUM")
+            zet_instelling(conn, "secure_delete_opgeschoond", "ja")
         if not conn.execute("SELECT 1 FROM onderhoudstype LIMIT 1").fetchone():
             conn.executemany(
                 "INSERT INTO onderhoudstype (naam, voertuigsoorten, interval_km, interval_maanden) VALUES (?,?,?,?)",

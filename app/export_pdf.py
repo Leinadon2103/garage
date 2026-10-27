@@ -227,6 +227,8 @@ def maak(voertuig, beurten: list[dict], met_kosten: bool = True, km: list[dict] 
     bijlagen = [(b, f) for b in chronologisch for f in b["facturen"]]
     bijlage_nrs = {f["id"]: i for i, (_, f) in enumerate(bijlagen, start=1)}
 
+    # Foutpagina's noemen de bijlage alleen via de kop (nummer, datum, onderhoud), nooit via de oorspronkelijke
+    # bestandsnaam: die kan een naam bevatten, bijv. 'factuur Jansen.pdf'.
     writer = PdfWriter()
     writer.append(PdfReader(io.BytesIO(_overzicht(voertuig, beurten, bijlage_nrs, met_kosten, km, specs))))
 
@@ -236,18 +238,18 @@ def maak(voertuig, beurten: list[dict], met_kosten: bool = True, km: list[dict] 
         try:
             pad = db.bestand(f["pad"])
         except ValueError:
-            writer.append(_foutpagina(kop, f"'{f['originele_naam']}' heeft een ongeldig bestandspad"))
+            writer.append(_foutpagina(kop, "het bestand heeft een ongeldig bestandspad"))
             continue
         # één kapotte of ontbrekende bijlage mag de hele uitdraai niet blokkeren
         if not f["gecontroleerd"]:  # nooit een ongecontroleerd origineel delen
-            writer.append(_foutpagina(kop, f"'{f['originele_naam']}' is nog niet gecontroleerd op persoonsgegevens"))
+            writer.append(_foutpagina(kop, "de factuur is nog niet gecontroleerd op persoonsgegevens"))
             continue
         try:
             if not met_kosten:
                 # kosten verbergen geldt ook voor de facturen zelf: bedragen echt verwijderen (alleen in deze uitdraai)
                 zonder_bedragen = lakken.bedragen_weglakken(pad, f["mime_type"])
                 if zonder_bedragen is None:
-                    writer.append(_foutpagina(kop, f"'{f['originele_naam']}' is weggelaten: er was geen tekst te herkennen, "
+                    writer.append(_foutpagina(kop, "de factuur is weggelaten: er was geen tekst te herkennen, "
                                                    "dus bedragen kunnen niet worden verborgen"))
                     continue
                 pad, mime = io.BytesIO(zonder_bedragen[0]), zonder_bedragen[1]
@@ -261,9 +263,9 @@ def maak(voertuig, beurten: list[dict], met_kosten: bool = True, km: list[dict] 
             else:
                 writer.append(_afbeelding_pdf(pad, kop))
         except FileNotFoundError:
-            writer.append(_foutpagina(kop, f"bestand '{f['originele_naam']}' ontbreekt"))
+            writer.append(_foutpagina(kop, "het bestand ontbreekt"))
         except Exception as e:  # noqa: BLE001 - pypdf/PIL gooien uiteenlopende fouten
-            writer.append(_foutpagina(kop, f"'{f['originele_naam']}' is onleesbaar ({type(e).__name__})"))
+            writer.append(_foutpagina(kop, f"het bestand is onleesbaar ({type(e).__name__})"))
 
     writer.add_metadata({"/Title": f"Onderhoudshistorie {voertuig['kenteken']}"})
     out = io.BytesIO()

@@ -3,6 +3,7 @@ uvicorn
 jinja2
 python-multipart
 httpx
+httpx2
 reportlab
 pypdf
 pymupdf
