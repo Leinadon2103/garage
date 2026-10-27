@@ -351,6 +351,32 @@ def data_file(rel: str | None) -> Path:
     return path
 
 
+# Every read, write and delete of a file in the data folder goes through these three functions (a test checks
+# that), so encrypting the files (P1) changes only these.
+
+def read_file(rel: str | None) -> bytes:
+    """Content of a data file. ValueError for an invalid path, FileNotFoundError if it is missing."""
+    return data_file(rel).read_bytes()
+
+
+def write_file(rel: str, data: bytes) -> None:
+    """Writes atomically: a crash never leaves half a file under the real name (a '.deel' file instead, which
+    backup.clean_up() removes)."""
+    path = data_file(rel)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    part = path.with_name(path.name + ".deel")
+    try:
+        part.write_bytes(data)
+        os.replace(part, path)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
+
+
+def delete_file(rel: str | None) -> None:
+    data_file(rel).unlink(missing_ok=True)
+
+
 def invalid_paths(conn: sqlite3.Connection) -> list[str]:
     """All file paths in the database that data_file() refuses (check after a restore)."""
     paths = [r[0] for r in conn.execute(

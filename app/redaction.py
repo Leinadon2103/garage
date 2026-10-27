@@ -3,10 +3,12 @@
 Boxes are fractions (0-1) of the page width/height, so the browser can draw them independent of the pixel
 size. In PDFs the text under a box is really removed (PyMuPDF redaction), not just covered; in images the
 pixels are blacked out and metadata (EXIF, including GPS) is dropped.
+
+Everything works on file contents (bytes), never on a path: files are read and written through db.read_file
+and db.write_file only.
 """
 import io
 import re
-from pathlib import Path
 
 import pymupdf
 from PIL import Image, ImageDraw, ImageOps
@@ -30,11 +32,8 @@ class RedactionError(Exception):
     pass
 
 
-def _open_pdf(path: Path) -> pymupdf.Document:
-    if isinstance(path, (bytes, io.BytesIO)):
-        doc = pymupdf.open(stream=path.getvalue() if isinstance(path, io.BytesIO) else path, filetype="pdf")
-    else:
-        doc = pymupdf.open(path)
+def _open_pdf(content: bytes) -> pymupdf.Document:
+    doc = pymupdf.open(stream=content, filetype="pdf")
     # turn annotations (including sticky notes with text in a popup) and form fields into normal page content:
     # then you see them on the redaction screen, the suggestions find them and they disappear under a box
     doc.bake(annots=True, widgets=True)
@@ -44,9 +43,9 @@ def _open_pdf(path: Path) -> pymupdf.Document:
     return doc
 
 
-def _open_image(path: Path) -> Image.Image:
+def _open_image(content: bytes) -> Image.Image:
     try:
-        with Image.open(path) as im:
+        with Image.open(io.BytesIO(content)) as im:
             im = ImageOps.exif_transpose(im).copy()
     except (OSError, ValueError, Image.DecompressionBombError) as e:
         raise RedactionError(f"Afbeelding kan niet worden geopend ({type(e).__name__}).")
@@ -54,20 +53,20 @@ def _open_image(path: Path) -> Image.Image:
     return im
 
 
-def page_count(path: Path, mime: str) -> int:
+def page_count(content: bytes, mime: str) -> int:
     if mime != "application/pdf":
         return 1
-    with pymupdf.open(path) as doc:
+    with pymupdf.open(stream=content, filetype="pdf") as doc:
         return doc.page_count
 
 
-def page_png(path: Path, mime: str, nr: int) -> bytes:
+def page_png(content: bytes, mime: str, nr: int) -> bytes:
     if mime == "application/pdf":
-        with _open_pdf(path) as doc:
+        with _open_pdf(content) as doc:
             page = doc[nr]
             zoom = min(WIDTH_PX / page.rect.width, 3)
             return page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom)).tobytes("png")
-    im = _open_image(path)
+    im = _open_image(content)
     im.thumbnail((WIDTH_PX * 2, WIDTH_PX * 2))
     buf = io.BytesIO()
     im.convert("RGB").save(buf, "PNG")
@@ -78,13 +77,13 @@ MARGIN = 0.003  # small margin left/right of each word, as a fraction of the pag
                 # word boxes are already line high and would otherwise touch the line above/below)
 
 
-def words_per_page(path, mime: str) -> list[list[dict]]:
+def words_per_page(content: bytes, mime: str) -> list[list[dict]]:
     """Per page the words with their box (fractions 0-1) and a line key.
     From the text layer of a PDF; for photos and scanned pages via Windows OCR."""
     result = []
     if mime != "application/pdf":
-        return [ocr.recognize(_open_image(path))]
-    with _open_pdf(path) as doc:
+        return [ocr.recognize(_open_image(content))]
+    with _open_pdf(content) as doc:
         for p in doc:
             r = p.rect
             text = p.get_text("words")
@@ -101,7 +100,7 @@ def _box(words: list[dict], nr: int, reason: str, active: bool) -> dict:
             "x1": min(1, max(w["x1"] for w in words) + MARGIN), "y1": min(1, max(w["y1"] for w in words))}
 
 
-def suggestions(path: Path, mime: str, private_terms: list[str]) -> list[dict]:
+def suggestions(content: bytes, mime: str, private_terms: list[str]) -> list[dict]:
     """Proposed boxes, from the text layer or (for photos and scans) via OCR.
 
     Your own details (Settings) are on straight away. Patterns (postcode, e-mail, ...) often also hit the
@@ -111,7 +110,7 @@ def suggestions(path: Path, mime: str, private_terms: list[str]) -> list[dict]:
     # own details: case and number of spaces may differ (PDF and OCR do that differently)
     own = [re.compile(r"\s+".join(map(re.escape, t.split())), re.IGNORECASE) for t in private_terms if t.split()]
     result = []
-    for nr, words in enumerate(words_per_page(path, mime)):
+    for nr, words in enumerate(words_per_page(content, mime)):
         per_line: dict = {}
         for w in words:
             per_line.setdefault(w["line"], []).append(w)
@@ -140,8 +139,8 @@ def suggestions(path: Path, mime: str, private_terms: list[str]) -> list[dict]:
     return result
 
 
-def apply(original: Path, mime: str, boxes: list[dict], target: Path) -> None:
-    """Writes a redacted copy to `target`. The original stays untouched."""
+def apply(original: bytes, mime: str, boxes: list[dict]) -> bytes:
+    """A redacted copy of the original."""
     if mime == "application/pdf":
         with _open_pdf(original) as doc:
             for b in boxes:
@@ -159,8 +158,7 @@ def apply(original: Path, mime: str, boxes: list[dict], target: Path) -> None:
                 page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_PIXELS)
                 page.set_mediabox(page.cropbox)
             doc.scrub()  # remove metadata, hidden text, attachments etc.
-            doc.save(target, garbage=4, deflate=True)
-        return
+            return doc.tobytes(garbage=4, deflate=True)
 
     im = _open_image(original)
     im = im.convert("RGB") if mime == "image/jpeg" else im.convert("RGBA")
@@ -170,7 +168,9 @@ def apply(original: Path, mime: str, boxes: list[dict], target: Path) -> None:
         draw.rectangle([b["x0"] * w, b["y0"] * h, b["x1"] * w, b["y1"] * h], fill="black")
     # save again without EXIF/comments: they can contain the GPS location and device details
     im.info.clear()
-    im.save(target, "JPEG", quality=92) if mime == "image/jpeg" else im.save(target, "PNG")
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=92) if mime == "image/jpeg" else im.save(buf, "PNG")
+    return buf.getvalue()
 
 
 # an amount as a separate word: 54,00 / 1.234,56 / €72,50 / 54.00 / -15,00 / 54,- ; also separate €/EUR signs
@@ -179,15 +179,15 @@ AMOUNT_WORD = re.compile(r"(€|eur|euro)?[:]?-?(€)?(\d{1,3}(\.\d{3})+|\d+)([,
                          r"|€|eur|euro|euro's", re.IGNORECASE)
 
 
-def redact_amounts(path, mime: str) -> tuple[bytes, str] | None:
+def redact_amounts(content: bytes, mime: str) -> tuple[bytes, str] | None:
     """Copy of an invoice with all amounts really removed (for a printout without costs).
     Returns (content, mime type), or None if no text can be found (then it cannot be done safely)."""
-    words = words_per_page(path, mime)
+    words = words_per_page(content, mime)
     if not words or not all(words):  # one page without recognized text = amounts could be on it
         return None
     boxes = [(nr, w) for nr, ws in enumerate(words) for w in ws if AMOUNT_WORD.fullmatch(w["text"].strip())]
     if mime != "application/pdf":
-        im = _open_image(path).convert("RGB")
+        im = _open_image(content).convert("RGB")
         draw = ImageDraw.Draw(im)
         for _, w in boxes:
             draw.rectangle([(w["x0"] - MARGIN) * im.width, w["y0"] * im.height,
@@ -195,7 +195,7 @@ def redact_amounts(path, mime: str) -> tuple[bytes, str] | None:
         buf = io.BytesIO()
         im.save(buf, "PNG")
         return buf.getvalue(), "image/png"
-    with _open_pdf(path) as doc:
+    with _open_pdf(content) as doc:
         for nr, w in boxes:
             r = doc[nr].rect
             # only the middle of the line height: hits the amount itself, not the (overlapping) neighbouring lines

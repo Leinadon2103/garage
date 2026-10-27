@@ -3,13 +3,13 @@
 Result: words with their box as fractions (0-1) of the image, ready for the redaction suggestions, hiding
 amounts and reading invoices.
 """
+import base64
 import hashlib
+import io
 import json
 import logging
-import os
 import subprocess
 import sys
-import tempfile
 from collections import OrderedDict
 from pathlib import Path
 
@@ -42,13 +42,13 @@ def recognize(im: Image.Image) -> list[dict]:
         _cache.move_to_end(key)
         return _cache[key]
 
-    fd, tmp = tempfile.mkstemp(suffix=".png")
-    os.close(fd)
     try:
-        im.save(tmp, "PNG")
+        png = io.BytesIO()
+        im.save(png, "PNG")
+        # via stdin, not a temporary file: that would be a readable copy of the invoice after a crash (P8)
         r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-                            "-File", str(SCRIPT), "-Path", tmp], capture_output=True, timeout=TIMEOUT,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))  # no flashing window
+                            "-File", str(SCRIPT)], input=base64.b64encode(png.getvalue()), capture_output=True,
+                           timeout=TIMEOUT, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))  # no flashing window
         if r.returncode != 0:
             logging.warning("OCR failed: %s", r.stderr.decode("utf-8", "replace")[:500])
             return []
@@ -59,8 +59,6 @@ def recognize(im: Image.Image) -> list[dict]:
     except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError, ZeroDivisionError):
         logging.exception("OCR failed")
         return []
-    finally:
-        Path(tmp).unlink(missing_ok=True)
     _cache[key] = words
     while len(_cache) > 32:
         _cache.popitem(last=False)

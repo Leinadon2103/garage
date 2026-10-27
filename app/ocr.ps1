@@ -1,12 +1,12 @@
 # Text recognition with the built-in Windows OCR (offline). Used by app/ocr.py.
-# Input: path to an image (PNG/JPG). Output (JSON): language, width, height and per word text + box.
-param([Parameter(Mandatory)][string]$Path, [switch]$Languages)
+# Input: an image (PNG/JPG) as base64 on stdin, never as a file: a temporary copy of an invoice could stay
+# behind after a crash (P8). Output (JSON): language, width, height and per word text + box.
+param([switch]$Languages)
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
 $null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Graphics.Imaging, ContentType = WindowsRuntime]
-$null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRuntime]
 
 if ($Languages) {
     @([Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages | ForEach-Object { $_.LanguageTag }) | ConvertTo-Json -Compress
@@ -32,8 +32,8 @@ foreach ($tag in @("nl-NL", "nl")) {
 if (-not $engine) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
 if (-not $engine) { throw "No OCR language available in Windows" }
 
-$file = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync((Resolve-Path $Path).Path)) ([Windows.Storage.StorageFile])
-$stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
+$bytes = [Convert]::FromBase64String([Console]::In.ReadToEnd().Trim())  # base64: stdin is text in PowerShell
+$stream = [System.IO.WindowsRuntimeStreamExtensions]::AsRandomAccessStream((New-Object IO.MemoryStream (, $bytes)))
 $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
 $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
 $result = Await ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])

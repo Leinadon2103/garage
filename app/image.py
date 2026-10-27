@@ -1,8 +1,6 @@
 """Image of the vehicle: search and save 3D models (Sketchfab) and photos (Wikimedia Commons)."""
 import io
-import uuid
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from urllib.parse import urlparse
 
 lazy import httpx  # load only when searching/saving; at startup main.py only uses ALLOWED_HOSTS
@@ -98,29 +96,28 @@ def search_all(make, model) -> tuple[list[dict], list[dict], str | None]:
     return search_both(lambda: _collect(search_3d, terms, "uid"), lambda: _collect(search_photos, terms, "thumb"))
 
 
-def _save(content: bytes, folder: Path) -> str:
-    """Saves as JPEG without EXIF (no GPS location) and returns the file name."""
+def _clean(content: bytes) -> bytes:
+    """As JPEG without EXIF (no GPS location), at most MAX_PX; the caller saves it with db.write_file."""
     try:
         with Image.open(io.BytesIO(content)) as im:
             im = ImageOps.exif_transpose(im).convert("RGB")
             im.info.clear()  # no EXIF/comment (could contain a location or name)
             im.thumbnail((MAX_PX, MAX_PX))
-            folder.mkdir(parents=True, exist_ok=True)
-            name = f"{uuid.uuid4().hex}.jpg"
-            im.save(folder / name, "JPEG", quality=88)
-            return name
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=88)
+            return buf.getvalue()
     except (OSError, ValueError, Image.DecompressionBombError):
         raise ImageError("Dit bestand is geen geldige afbeelding.")
 
 
-def download(url: str, folder: Path) -> str:
+def download(url: str) -> bytes:
     if urlparse(url).hostname not in ALLOWED_HOSTS:
         raise ImageError("Onbekende afbeeldingsbron.")
     r = _get(url)
     if r.url.host not in ALLOWED_HOSTS:  # also after a redirect
         raise ImageError("Onbekende afbeeldingsbron.")
-    return _save(r.content, folder)
+    return _clean(r.content)
 
 
-def own_photo(content: bytes, folder: Path) -> str:
-    return _save(content, folder)
+def own_photo(content: bytes) -> bytes:
+    return _clean(content)

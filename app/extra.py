@@ -7,10 +7,9 @@ from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
 
 from . import backup, db, planning
-from .web import ALLOWED, delete_files, fetch, mime_for, or_400, parse_int, read_uploads, redirect, render
+from .web import ALLOWED, delete_files, fetch, file_response, or_400, parse_int, read_uploads, redirect, render
 
 router = APIRouter()
 
@@ -179,17 +178,15 @@ async def add_document(vid: int, kind: str = Form(...), title: str = Form(""), e
     name, ext, content = uploads[0]
     with db.connect() as conn:
         fetch(conn, "vehicle", vid)
-        folder = db.DATA_DIR / "documenten" / str(vid)
-        folder.mkdir(parents=True, exist_ok=True)
-        path = folder / f"{uuid.uuid4().hex}{ext}"
-        path.write_bytes(content)
+        path = f"documenten/{vid}/{uuid.uuid4().hex}{ext}"
+        db.write_file(path, content)
         try:
             conn.execute("INSERT INTO document (vehicle_id, kind, title, path, original_filename, mime_type, expiry_date,"
                          " added_on) VALUES (?,?,?,?,?,?,?,?)",
-                         (vid, kind, title.strip() or None, path.relative_to(db.DATA_DIR).as_posix(),
-                          name, ALLOWED[ext][0], expiry_date, date.today().isoformat()))
+                         (vid, kind, title.strip() or None, path, name, ALLOWED[ext][0], expiry_date,
+                          date.today().isoformat()))
         except Exception:
-            path.unlink(missing_ok=True)
+            delete_files([path])
             raise
     return redirect(f"/vehicles/{vid}/documents")
 
@@ -198,13 +195,7 @@ async def add_document(vid: int, kind: str = Form(...), title: str = Form(""), e
 def open_document(did: int):
     with db.connect() as conn:
         d = fetch(conn, "document", did)
-    try:
-        path = db.data_file(d["path"])
-    except ValueError:
-        raise HTTPException(404, "Bestand niet gevonden")
-    if not path.is_file():
-        raise HTTPException(404, "Bestand ontbreekt op schijf")
-    return FileResponse(path, media_type=mime_for(path), filename=d["original_filename"], content_disposition_type="inline")
+    return file_response(d["path"], d["original_filename"])
 
 
 @router.post("/documents/{did}/delete")

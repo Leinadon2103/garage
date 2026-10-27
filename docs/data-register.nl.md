@@ -65,7 +65,8 @@ Alleen bij gebruik van de functie, zonder account of telemetrie (zie ook PRIVACY
 ## Tijdelijke kopieën
 | Wat | Plek | Opgeruimd |
 |---|---|---|
-| Afbeelding van een factuur voor OCR | `%TEMP%\tmp*.png` | direct na de OCR; bij een crash blijft hij staan (P8) |
+| ~~Afbeelding van een factuur voor OCR~~ | geen meer: gaat sinds P8 via stdin naar PowerShell, alleen in het geheugen | - |
+| Half geschreven gegevensbestand | `*.deel` naast het bestand in `facturen\`, `documenten\`, `beelden\` | direct bij een fout; na een crash bij de volgende start; gaat nooit mee in een back-up |
 | Databasekopie voor een back-up | tijdelijke map in `%TEMP%` | direct na het inpakken |
 | Back-up die via "bestand kiezen" wordt teruggezet | tijdelijke map in `%TEMP%` | direct na het terugzetten |
 | Uitgepakte back-up, kopie van de huidige database | `.herstel-tmp\` in de gegevensmap | direct na het terugzetten; na een crash bij de volgende start (eerst wordt de oude stand teruggezet als het terugzetten niet af was) |

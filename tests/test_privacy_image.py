@@ -54,7 +54,7 @@ def test_redaction_really_removes_text_and_keeps_original(client):
     f = first_invoice()
     with db.connect() as conn:
         terms = db.private_terms(conn)
-    sugg = redaction.suggestions(db.DATA_DIR / f["path"], f["mime_type"], terms)
+    sugg = redaction.suggestions(db.read_file(f["path"]), f["mime_type"], terms)
     own = [s for s in sugg if s["reason"] == "jouw gegevens"]
     assert own and all(s["active"] for s in own)
     assert not any(s["active"] for s in sugg if s["reason"] != "jouw gegevens")  # patterns off with own terms
@@ -104,7 +104,7 @@ def test_rotated_pdf_redacted_in_the_right_place(client):
     vid = add_vehicle(client)
     new_service(client, vid, files=[("invoices", ("scan.pdf", buf.getvalue(), "application/pdf"))])
     f = first_invoice()
-    sugg = [s for s in redaction.suggestions(db.DATA_DIR / f["path"], f["mime_type"], []) if s["reason"] == "postcode"]
+    sugg = [s for s in redaction.suggestions(db.read_file(f["path"]), f["mime_type"], []) if s["reason"] == "postcode"]
     client.post(f"/invoices/{f['id']}/redact", data={"redactions": json.dumps(sugg)})
     text = PdfReader(io.BytesIO(client.get(f"/invoices/{f['id']}").content)).pages[0].extract_text()
     assert "1234 AB" not in text and "Olie verversen" in text
@@ -259,7 +259,7 @@ def test_redacting_again_builds_on_earlier_boxes(client):
     vid = add_vehicle(client)
     new_service(client, vid, files=[("invoices", ("f.pdf", pdf_with_address(), "application/pdf"))])
     f = first_invoice()
-    name = [s for s in redaction.suggestions(db.DATA_DIR / f["path"], f["mime_type"], ["Jan de Vries"])
+    name = [s for s in redaction.suggestions(db.read_file(f["path"]), f["mime_type"], ["Jan de Vries"])
             if s["reason"] == "jouw gegevens"]
     client.post(f"/invoices/{f['id']}/redact", data={"redactions": json.dumps(name)})
     page = client.get(f"/invoices/{f['id']}/redact").text

@@ -92,7 +92,7 @@ def create(folder: Path | None = None, prefix: str = PREFIX, keep_also: Path | N
                     z.write(copy, db.DB_NAME)
                     for sub in FOLDERS:
                         for file in sorted((db.DATA_DIR / sub).rglob("*")) if (db.DATA_DIR / sub).is_dir() else []:
-                            if file.is_file():
+                            if file.is_file() and file.suffix != ".deel":  # a file being written right now
                                 z.write(file, file.relative_to(db.DATA_DIR).as_posix())
                                 count += 1
                     z.writestr("garage-backup.json", json.dumps({"created": datetime.now().isoformat(timespec="seconds"),
@@ -254,7 +254,7 @@ def _swap(new: Path) -> None:
 
 def clean_up() -> None:
     """At startup, before db.init(): clean up the leftovers of an interrupted restore. They contain full copies
-    of the data (including original invoices). If the restore was interrupted halfway, first put back the old
+    of the data (including original invoices). Half written data files ('.deel') go as well. If the restore was interrupted halfway, first put back the old
     state: the folder .oud-facturen can then be the only copy. An error here must not stop the startup."""
     data, tmp = db.DATA_DIR, db.DATA_DIR / RESTORE_TMP
     with _LOCK:
@@ -274,6 +274,8 @@ def clean_up() -> None:
                 if old.exists() and not (data / sub).exists():  # without a marker (from before 1.4): never throw away
                     os.replace(old, data / sub)
                 shutil.rmtree(old, ignore_errors=True)
+                for part in (data / sub).rglob("*.deel") if (data / sub).is_dir() else []:  # db.write_file after a crash
+                    part.unlink(missing_ok=True)
             shutil.rmtree(tmp, ignore_errors=True)
         except Exception:  # noqa: BLE001 - the leftovers stay; try again at the next start
             logging.exception("Cleaning up the leftovers of a restore failed")

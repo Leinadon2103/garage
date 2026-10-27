@@ -4,7 +4,7 @@ import threading
 import uuid
 from contextlib import asynccontextmanager
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -16,8 +16,8 @@ from . import backup, db, extra, image, planning
 
 # load only when a screen needs them: PyMuPDF, reportlab, pypdf and httpx make the startup slow otherwise
 lazy from . import export_pdf, invoice_reader, rdw, redaction
-from .web import (ALLOWED, VEHICLE_TYPES, delete_files, fetch, format_plate, invoice_paths, mime_for, or_400,  # noqa: F401
-                  parse_amount, parse_int, read_uploads, redirect, render, templates)
+from .web import (ALLOWED, VEHICLE_TYPES, delete_files, fetch, file_response, format_plate, invoice_paths,  # noqa: F401
+                  mime_for, or_400, parse_amount, parse_int, read_uploads, redirect, render, templates)
 
 HERE = Path(__file__).resolve().parent
 
@@ -311,11 +311,18 @@ def choose_image(request: Request, vid: int, q: str = ""):
     return render(request, "image.html", v=v, models=models, photos=photos, error=error, query=query)
 
 
-def _set_image(vid: int, kind: str | None, name: str | None, ref=None, title=None, source=None):
-    with db.connect() as conn:
-        old = fetch(conn, "vehicle", vid)["image_path"]
-        conn.execute("UPDATE vehicle SET image_type=?, image_ref=?, image_title=?, image_source=?, image_path=? WHERE id=?",
-                     (kind, ref, title, source, f"beelden/{name}" if name else None, vid))
+def _set_image(vid: int, kind: str | None, content: bytes | None, ref=None, title=None, source=None):
+    path = f"beelden/{uuid.uuid4().hex}.jpg" if content else None
+    if path:
+        db.write_file(path, content)
+    try:
+        with db.connect() as conn:
+            old = fetch(conn, "vehicle", vid)["image_path"]
+            conn.execute("UPDATE vehicle SET image_type=?, image_ref=?, image_title=?, image_source=?, image_path=? WHERE id=?",
+                         (kind, ref, title, source, path, vid))
+    except Exception:
+        delete_files([path])  # no orphaned file
+        raise
     delete_files([old])
 
 
@@ -327,14 +334,14 @@ def save_image(request: Request, vid: int, kind: str = Form(...), thumb: str = F
     with db.connect() as conn:
         fetch(conn, "vehicle", vid)  # check first, download after (no orphaned files)
     try:
-        name = image.download(thumb, db.DATA_DIR / "beelden")
+        content = image.download(thumb)
     except image.ImageError as e:
         raise HTTPException(502, str(e))
     if kind == "3d":
         source = f"https://sketchfab.com/3d-models/{uid}"
     elif not source.startswith("https://commons.wikimedia.org/"):
         source = None
-    _set_image(vid, kind, name, uid or None, title.strip() or None, source)
+    _set_image(vid, kind, content, uid or None, title.strip() or None, source)
     return redirect(f"/vehicles/{vid}")
 
 
@@ -343,10 +350,10 @@ async def upload_image(vid: int, photo: UploadFile = File(...)):
     with db.connect() as conn:
         fetch(conn, "vehicle", vid)
     try:
-        name = image.own_photo(await photo.read(), db.DATA_DIR / "beelden")
+        content = image.own_photo(await photo.read())
     except image.ImageError as e:
         raise HTTPException(400, str(e))
-    _set_image(vid, "own", name, title="Eigen foto")
+    _set_image(vid, "own", content, title="Eigen foto")
     return redirect(f"/vehicles/{vid}")
 
 
@@ -361,13 +368,11 @@ def image_file(vid: int):
     with db.connect() as conn:
         path = fetch(conn, "vehicle", vid)["image_path"]
     try:
-        file = db.data_file(path)
-    except ValueError:
-        raise HTTPException(404, "Geen beeld")
-    if not file.is_file():
+        content = db.read_file(path)
+    except (ValueError, FileNotFoundError):
         raise HTTPException(404, "Geen beeld")
     # pages request this with ?v=<file name> (web.image_url); that url changes with every new image
-    return FileResponse(file, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000, immutable"})
+    return Response(content, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000, immutable"})
 
 
 # ---------- services ----------
@@ -430,14 +435,11 @@ async def save_service(request: Request, vid: int, sid: int | None, form_data: d
         conn.executemany("INSERT INTO service_maintenance_type (service_id, type_id) VALUES (?,?)",
                          [(sid, t) for t in type_ids])
 
-        folder = db.DATA_DIR / "facturen" / str(vid)
-        folder.mkdir(parents=True, exist_ok=True)
         written = []
         try:
             for name, ext, content in uploads:
-                path = folder / f"{uuid.uuid4().hex}{ext}"
-                path.write_bytes(content)
-                written.append(path.relative_to(db.DATA_DIR).as_posix())
+                written.append(f"facturen/{vid}/{uuid.uuid4().hex}{ext}")
+                db.write_file(written[-1], content)
                 conn.execute("INSERT INTO invoice (service_id, path, original_filename, mime_type) VALUES (?,?,?,?)",
                              (sid, written[-1], name, ALLOWED[ext][0]))
         except Exception:
@@ -484,29 +486,19 @@ def delete_service(sid: int):
 
 # ---------- invoices ----------
 
-def _file(path: str, name: str) -> FileResponse:
-    try:
-        file = db.data_file(path)
-    except ValueError:
-        raise HTTPException(404, "Factuurbestand niet gevonden")
-    if not file.is_file():
-        raise HTTPException(404, "Factuurbestand ontbreekt op schijf")
-    return FileResponse(file, media_type=mime_for(file), filename=name, content_disposition_type="inline")
-
-
 @app.get("/invoices/{iid}")
 def open_invoice(iid: int):
     """The version that gets shared: redacted if that has been done."""
     with db.connect() as conn:
         f = fetch(conn, "invoice", iid)
-    return _file(f["path"], f["original_filename"])
+    return file_response(f["path"], f["original_filename"], "Factuurbestand")
 
 
 @app.get("/invoices/{iid}/original")
 def open_original_invoice(iid: int):
     with db.connect() as conn:
         f = fetch(conn, "invoice", iid)
-    return _file(f["original_path"] or f["path"], f["original_filename"])
+    return file_response(f["original_path"] or f["path"], f["original_filename"], "Factuurbestand")
 
 
 @app.post("/invoices/{iid}/delete")
@@ -549,14 +541,13 @@ def redact_invoice(request: Request, iid: int):
                   pages=redaction.page_count(original, f["mime_type"]), suggestions=earlier + suggestions)
 
 
-def _original(f) -> Path:
+def _original(f) -> bytes:
     try:
-        path = db.data_file(f["original_path"] or f["path"])
+        return db.read_file(f["original_path"] or f["path"])
     except ValueError:
         raise HTTPException(404, "Factuurbestand niet gevonden")
-    if not path.is_file():
+    except FileNotFoundError:
         raise HTTPException(404, "Factuurbestand ontbreekt op schijf")
-    return path
 
 
 @app.get("/invoices/{iid}/page/{nr}.png")
@@ -592,20 +583,22 @@ def save_redaction(iid: int, redactions: str = Form("[]")):
     with db.connect() as conn:
         f = fetch(conn, "invoice", iid)
     original = _original(f)
-    original_rel = original.relative_to(db.DATA_DIR).as_posix()
+    original_rel = PurePosixPath(f["original_path"] or f["path"])
     clean = _read_boxes(redactions, redaction.page_count(original, f["mime_type"]))
-    target = original.with_name(f"{uuid.uuid4().hex}-gelakt{original.suffix}")
     try:
-        redaction.apply(original, f["mime_type"], clean, target)
-    except Exception as e:
-        target.unlink(missing_ok=True)  # do not leave a half written file behind
-        if isinstance(e, redaction.RedactionError):
-            raise HTTPException(400, str(e))
-        raise
+        redacted = redaction.apply(original, f["mime_type"], clean)
+    except redaction.RedactionError as e:
+        raise HTTPException(400, str(e))
+    target = original_rel.with_name(f"{uuid.uuid4().hex}-gelakt{original_rel.suffix}").as_posix()
+    db.write_file(target, redacted)
     old_redacted = f["path"] if f["original_path"] else None
-    with db.connect() as conn:
-        conn.execute("UPDATE invoice SET path = ?, original_path = ?, reviewed = 1, redactions = ? WHERE id = ?",
-                     (target.relative_to(db.DATA_DIR).as_posix(), original_rel, json.dumps(clean), iid))
+    try:
+        with db.connect() as conn:
+            conn.execute("UPDATE invoice SET path = ?, original_path = ?, reviewed = 1, redactions = ? WHERE id = ?",
+                         (target, original_rel.as_posix(), json.dumps(clean), iid))
+    except Exception:
+        delete_files([target])  # no orphaned file
+        raise
     delete_files([old_redacted])
     return redirect(f"/services/{f['service_id']}/redact")
 
