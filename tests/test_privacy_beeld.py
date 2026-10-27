@@ -182,6 +182,24 @@ def test_beeld_zonder_internet(client, monkeypatch):
 
 # ---------- overig ----------
 
+def test_nieuwe_foto_krijgt_nieuwe_url(client):
+    """Anders toont de browser (WebView2) na het wisselen van foto nog de oude uit zijn cache."""
+    import re
+    vid = voeg_voertuig_toe(client)
+    urls = []
+    for kleur in ("red", "blue"):
+        jpg = io.BytesIO()
+        Image.new("RGB", (40, 30), kleur).save(jpg, "JPEG")
+        client.post(f"/voertuigen/{vid}/beeld/upload", files={"foto": ("f.jpg", jpg.getvalue(), "image/jpeg")})
+        urls.append(re.search(rf'src="(/voertuigen/{vid}/beeld\.jpg\?v=\w+)"', client.get(f"/voertuigen/{vid}").text)[1])
+    assert urls[0] != urls[1]
+    assert urls[1] in client.get("/").text
+    r = client.get(urls[1])
+    assert r.status_code == 200 and "immutable" in r.headers["cache-control"]
+    with Image.open(io.BytesIO(r.content)) as im:
+        assert im.getpixel((20, 15))[2] > 200  # de blauwe, niet de rode
+
+
 def test_beeld_een_bron_faalt_andere_blijft_zichtbaar(client, monkeypatch):
     def nep_get(url, **_):
         if "wikimedia" in url:  # bijv. Wikimedia die een User-Agent weigert

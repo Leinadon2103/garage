@@ -35,6 +35,8 @@ templates.env.filters["euro"] = euro
 templates.env.filters["nl_datum"] = lambda d: (date.fromisoformat(d) if isinstance(d, str) else d).strftime("%d-%m-%Y") if d else ""
 templates.env.globals["icon"] = lambda naam, klasse="": Markup(  # format() escapet naam en klasse
     '<svg class="i {}" aria-hidden="true"><use href="/static/icons.svg#i-{}"/></svg>').format(klasse, naam)
+# bestandsnaam in de url: een nieuw beeld = een nieuwe url, dus de browser toont nooit een oude kopie uit zijn cache
+templates.env.globals["beeld_url"] = lambda v: f"/voertuigen/{v['id']}/beeld.jpg?v={Path(v['beeld_pad']).stem}"
 templates.env.globals["soort_icoon"] = {"Motorfiets": "bike", "Bromfiets": "bike", "Personenauto": "car",
                                         "Bedrijfsauto": "truck", "Aanhangwagen": "truck"}
 

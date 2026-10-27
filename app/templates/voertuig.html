@@ -7,7 +7,7 @@
   <div class="viewer">
     {% if v.beeld_type == "3d" %}
       {% set embed = "https://sketchfab.com/models/" ~ v.beeld_ref ~ "/embed?autostart=1&autospin=0.15&ui_theme=light&ui_infos=0&ui_watermark=0&ui_hint=0&dnt=1&preload=1" %}
-      {% if v.beeld_pad %}<img src="/voertuigen/{{ v.id }}/beeld.jpg" alt="" id="voorbeeld-3d"{% if sketchfab_auto %} class="terugval"{% endif %}>{% endif %}
+      {% if v.beeld_pad %}<img src="{{ beeld_url(v) }}" alt="" id="voorbeeld-3d"{% if sketchfab_auto %} class="terugval"{% endif %}>{% endif %}
       {% if sketchfab_auto %}
       <iframe class="sketchfab" title="3D-model {{ v.beeld_titel }}" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen src="{{ embed }}"></iframe>
       {% else %}
@@ -18,7 +18,7 @@
       </div></div>
       {% endif %}
     {% elif v.beeld_pad %}
-      <img src="/voertuigen/{{ v.id }}/beeld.jpg" alt="{{ v.beeld_titel or '' }}">
+      <img src="{{ beeld_url(v) }}" alt="{{ v.beeld_titel or '' }}">
     {% else %}
       <div class="leeg-beeld"><div>
         {{ icon(soort_icoon.get(v.voertuigsoort, "car")) }}

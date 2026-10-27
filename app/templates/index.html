@@ -28,7 +28,7 @@
   {% for v in voertuigen %}
   <a href="/voertuigen/{{ v.id }}" class="voertuigkaart">
     <div class="beeld">
-      {% if v.beeld_pad %}<img src="/voertuigen/{{ v.id }}/beeld.jpg" alt="" loading="lazy">
+      {% if v.beeld_pad %}<img src="{{ beeld_url(v) }}" alt="" loading="lazy">
       {% else %}{{ icon(soort_icoon.get(v.voertuigsoort, "car")) }}{% endif %}
       {% if v.in_stalling %}<span class="chip">{{ icon("snowflake") }} In stalling</span>
       {% elif aandacht[v.id] %}<span class="chip bad">{{ icon("triangle-alert") }} {{ aandacht[v.id] }} aandachtspunt{{ "en" if aandacht[v.id] > 1 }}</span>

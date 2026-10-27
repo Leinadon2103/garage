@@ -364,7 +364,8 @@ def beeld_bestand(vid: int):
         raise HTTPException(404, "Geen beeld")
     if not bestand.is_file():
         raise HTTPException(404, "Geen beeld")
-    return FileResponse(bestand, media_type="image/jpeg")
+    # de pagina's vragen dit op met ?v=<bestandsnaam> (web.beeld_url); die url verandert bij elk nieuw beeld
+    return FileResponse(bestand, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000, immutable"})
 
 
 # ---------- onderhoudsbeurten ----------
