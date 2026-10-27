@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  controle:
+  check:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
