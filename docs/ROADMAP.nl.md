@@ -8,6 +8,7 @@ Stand: oktober 2026, na versie 1.3.0. Dit document is de overdracht naar een nie
 - **Taal:** code Engels (namen, commentaar, docstrings, database). Teksten die de gebruiker ziet Nederlands (schermen, meldingen, verkoop-PDF, mappen en bestanden in Documenten\Garage). Documentatie in twee talen: `X.md` Engels, `X.nl.md` Nederlands, met een verwijzing naar elkaar. Het overleg met Daniel is Nederlands. Geen em-dash (lang streepje). Termen: [glossary.md](glossary.md).
 - **Geen SecondBrain-vault:** dit is een privéproject; niets lezen of schrijven in de vault, ook niet als een hook erom vraagt.
 - **Git:** Claude commit of pusht niet zelf; wijzigingen klaarzetten, Daniel beslist. Nooit een Co-Authored-By-regel.
+- **Branches en PR's:** `main` is beschermd met de ruleset "Protect main" (Settings > Rules): wijzigingen alleen via een pull request, de CI-job `check` moet slagen op de nieuwste `main`, mergen alleen met *Squash and merge*, geen force-push of verwijderen, niemand op de bypass list. Werkwijze: `git switch -c <naam>`, committen, `git push -u origin <naam>`, PR openen, mergen als `check` groen is, daarna `git switch main`, `git pull` en `git fetch --prune`. Wie de CI-job hernoemt, past ook de ruleset aan.
 - **Echte gegevens niet lezen:** de app gebruikt `Projecten\Garage-data` (via de omgevingsvariabele `GARAGE_DATA`; de oude naam `ONDERHOUD_DATA` werkt nog). Testen gebeurt met `data\` (`start.bat`) of met de pytest-fixtures.
 - **Elke wijziging:** tests erbij, `pytest` groen (waarschuwingen tellen als fout) en CI groen; voor een release `build.bat` (pip-audit, bandit, tests, exe met zelftest, installatieprogramma).
 - **Python 3.15:** de code gebruikt `lazy import` (PEP 810), dus 3.15 is vereist. `pyyaml` heeft nog geen wheel voor 3.15; daarom draait bandit op 3.13 via `tools/bandit_scan.py`, dat bandit ook `lazy import` laat lezen (voorheen sloeg bandit main.py, web.py en image.py stilletjes over). Dependabot rekent op Linux, dus Windows-pakketten staan expliciet in `requirements*.in`. Het kent 3.15 ook nog niet: genereer `requirements*.txt` met `uvx --python 3.14 --from pip-tools pip-compile` (zie `.github/dependabot.yml`).
@@ -18,7 +19,7 @@ Stand: oktober 2026, na versie 1.3.0. Dit document is de overdracht naar een nie
 - Weglakken is echt (`apply_redactions` + `scrub`). Een ongecontroleerde factuur komt nooit in de verkoop-PDF. Van foto's wordt EXIF verwijderd.
 - Een privacyoverzicht in de app en in `PRIVACY.md`. Sketchfab laadt pas na een klik.
 - Pakketten liggen vast met hashes, met pip-audit, bandit en Dependabot (ook voor de GitHub Actions). Licentie AGPL-3.0, met `LICENSES.md`.
-- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10 en G9, en de omzetting naar Engelse code (migratie 2). CI draait op GitHub; de repo is openbaar.
+- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10 en G9, en de omzetting naar Engelse code (migratie 2). CI draait op GitHub; de repo is openbaar en `main` is beschermd (zie Werkafspraken).
 
 ## Juridisch kader (inschatting, geen juridisch advies)
 - Voor eigen gebruik valt Garage onder de **huishoudelijke uitzondering** (art. 2 lid 2 sub c AVG).

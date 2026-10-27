@@ -8,6 +8,7 @@ Status: October 2026, after version 1.3.0. This document is the handover to a ne
 - **Language:** code in English (names, comments, docstrings, database). Texts the user sees in Dutch (screens, notifications, sale PDF, folders and files in Documents\Garage). Documentation in two languages: `X.md` English, `X.nl.md` Dutch, linking to each other. Discussions with Daniel are in Dutch. No em dash (long dash). Terms: [glossary.md](glossary.md).
 - **No SecondBrain vault:** this is a private project; do not read or write anything in the vault, not even when a hook asks for it.
 - **Git:** Claude does not commit or push; prepare the changes, Daniel decides. Never a Co-Authored-By line.
+- **Branches and PRs:** `main` is protected by the ruleset "Protect main" (Settings > Rules): changes only through a pull request, the CI job `check` must pass on the latest `main`, merging only with *Squash and merge*, no force push or deletion, nobody on the bypass list. Way of working: `git switch -c <name>`, commit, `git push -u origin <name>`, open a PR, merge when `check` is green, then `git switch main`, `git pull` and `git fetch --prune`. Renaming the CI job means updating the ruleset too.
 - **Do not read real data:** the app uses `Projecten\Garage-data` (through the environment variable `GARAGE_DATA`; the old name `ONDERHOUD_DATA` still works). Testing uses `data\` (`start.bat`) or the pytest fixtures.
 - **Every change:** add tests, `pytest` green (warnings count as errors) and CI green; for a release `build.bat` (pip-audit, bandit, tests, exe with self-test, installer).
 - **Python 3.15:** the code uses `lazy import` (PEP 810), so 3.15 is required. `pyyaml` has no wheel for 3.15 yet; so bandit runs on 3.13 via `tools/bandit_scan.py`, which also makes it read `lazy import` (before, bandit silently skipped main.py, web.py and image.py). Dependabot compiles on Linux, so Windows-only packages are listed explicitly in `requirements*.in`. It does not know 3.15 yet either: generate `requirements*.txt` with `uvx --python 3.14 --from pip-tools pip-compile` (see `.github/dependabot.yml`).
@@ -18,7 +19,7 @@ Status: October 2026, after version 1.3.0. This document is the handover to a ne
 - Redaction is real (`apply_redactions` + `scrub`). An unreviewed invoice never ends up in the sale PDF. EXIF is removed from photos.
 - A privacy overview in the app and in `PRIVACY.md`. Sketchfab only loads after a click.
 - Packages are pinned with hashes, with pip-audit, bandit and Dependabot (also for the GitHub Actions). License AGPL-3.0, with `LICENSES.md`.
-- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10 and G9, and the conversion to English code (migration 2). CI runs on GitHub; the repo is public.
+- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10 and G9, and the conversion to English code (migration 2). CI runs on GitHub; the repo is public and `main` is protected (see Working agreements).
 
 ## Legal framework (estimate, not legal advice)
 - For personal use, Garage falls under the **household exemption** (Art. 2(2)(c) GDPR).

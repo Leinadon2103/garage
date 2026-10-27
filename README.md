@@ -32,7 +32,7 @@ Which data Garage stores and what goes outside is in [PRIVACY.md](PRIVACY.md) an
   - runs the tests;
   - builds `Garage.exe` with PyInstaller and runs its self-test (`Garage.exe --self-test`);
   - builds the installer with Inno Setup 6, in `build\installer\`. Change the version number in `installer.iss` and `tools\version.txt`.
-- **CI** (`.github/workflows/ci.yml`) runs the same checks and the tests on every push to `main` and every pull request.
+- **CI** (`.github/workflows/ci.yml`) runs the same checks and the tests on every push to `main` and every pull request. `main` is protected: changes go through a pull request, which can only be merged when CI passes.
 
 More: [docs/](docs/) has the [roadmap](docs/ROADMAP.md), the [data register](docs/data-register.md), the [data dictionary](docs/data-dictionary.md) and a [glossary](docs/glossary.md) of Dutch and English terms.
 
