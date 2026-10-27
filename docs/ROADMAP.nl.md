@@ -88,7 +88,7 @@ Gedaan staat ~~doorgestreept~~.
 | ~~**K3**~~ | ~~Back-up controleren na het maken: zip openen en `PRAGMA integrity_check`~~ | De back-up is de enige kopie van de originelen; P2 bouwt erop voort | gedaan |
 | **K4** | Exe en installatieprogramma bouwen in CI, met SHA-256 en GitHub artifact attestation | Aantoonbaar gebouwd uit deze broncode; gratis deel van S5 | middel |
 | **K5** | `CHANGELOG.md`, één plek voor het versienummer, git-tags | Releases navolgbaar | klein |
-| **K6** | Korte dreigingsanalyse en vastgelegde ontwerpbeslissingen (bijv. DPAPI of wachtwoord) | Keuzes in P1/P2 en S4 uitlegbaar | klein |
+| **K6** | Korte dreigingsanalyse en vastgelegde ontwerpbeslissingen (bijv. DPAPI of wachtwoord). P1/P2: [encryption.nl.md](encryption.nl.md); S4 nog open | Keuzes in P1/P2 en S4 uitlegbaar | klein |
 | **K7** | Regel en test: `app.log` bevat geen inhoud van facturen of lak-termen | Logbestanden lekken anders persoonsgegevens | klein |
 | **K8** | Licentiecontrole (bijv. `pip-licenses`) en SBOM in CI | `LICENSES.md` veroudert niet ongemerkt; AGPL-verplichtingen | klein |
 | **K9** | Coverage (`pytest-cov`) | Zien welke paden geen test hebben, vooral bij terugzetten en migreren | klein |
@@ -104,7 +104,7 @@ Gedaan staat ~~doorgestreept~~.
 
 ## Open beslissingen voor Daniel
 1. ~~Wordt de GitHub-repo openbaar?~~ Ja, de repo is openbaar. Nog open: gaat de app actief naar anderen? Dat bepaalt S5, F8 en F9.
-2. P1: DPAPI (geen wachtwoord, gekoppeld aan het Windows-account) of een eigen wachtwoord bij het opstarten?
+2. ~~P1: DPAPI of een eigen wachtwoord?~~ Besloten: DPAPI voor de gegevens op deze pc (P1), een wachtwoord op de back-up (P2), zodat terugzetten op een andere pc kan. Uitwerken in K6.
 3. P3: na verkoop alles wissen of een geanonimiseerd archief bewaren?
 4. Welke features (F1 t/m F9) hebben de voorkeur?
 5. Blijft Python 3.15 de basis? Het ecosysteem loopt nog achter (zie pyyaml, Dependabot), maar `lazy import` hangt ervan af.

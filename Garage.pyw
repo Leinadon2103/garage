@@ -295,6 +295,12 @@ def _self_test_steps(base: str, oil: int, lines: list[str]) -> None:
         lines.append(f"OK   {description}")
         return r
 
+    from app import crypto
+    key = crypto.new_key()  # catches a missing cryptography (cffi) or crypt32 call in the exe
+    if crypto.decrypt(crypto.unprotect(crypto.protect(key)), crypto.encrypt(key, b"ok", "self-test"), "self-test") != b"ok":
+        raise RuntimeError("encryption round trip failed")
+    lines.append("OK   encryption (DPAPI + AES-GCM)")
+
     pdf = pymupdf.open()
     pdf.new_page().insert_text((72, 72), "Invoice self-test")
     buf = io.BytesIO()

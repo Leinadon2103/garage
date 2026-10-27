@@ -4,6 +4,7 @@ jinja2
 python-multipart
 httpx
 httpx2
+cryptography
 reportlab
 pypdf
 pymupdf
