@@ -37,7 +37,7 @@ def herken(im: Image.Image) -> list[dict]:
     elif max(im.size) < MIN_PX:
         factor = MIN_PX / max(im.size)
         im = im.resize((round(im.width * factor), round(im.height * factor)), Image.LANCZOS)
-    sleutel = hashlib.sha1(im.tobytes()).hexdigest()
+    sleutel = hashlib.sha1(im.tobytes(), usedforsecurity=False).hexdigest()  # alleen een cachesleutel
     if sleutel in _cache:
         _cache.move_to_end(sleutel)
         return _cache[sleutel]

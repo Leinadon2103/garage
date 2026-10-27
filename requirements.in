@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+jinja2
+python-multipart
+httpx
+reportlab
+pypdf
+pymupdf
+pillow
+pywebview
+pytest

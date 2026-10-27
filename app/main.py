@@ -12,9 +12,12 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 
-from . import backup, beeld, db, export_pdf, extra, factuur_lezen, lakken, planning, rdw
+from . import backup, beeld, db, extra, planning
+
+# pas laden als een scherm ze nodig heeft: PyMuPDF, reportlab, pypdf en httpx maken het opstarten anders traag
+lazy from . import export_pdf, factuur_lezen, lakken, rdw
 from .web import (TOEGESTAAN, VOERTUIGSOORTEN, _of_400, bedrag, factuur_paden, getal, haal, kenteken_opmaak,  # noqa: F401
-                  lees_uploads, render, templates, terug, verwijder_bestanden)
+                  lees_uploads, mime_voor, render, templates, terug, verwijder_bestanden)
 
 HIER = Path(__file__).resolve().parent
 
@@ -44,12 +47,41 @@ async def alleen_eigen_app(request: Request, call_next):
         site = request.headers.get("sec-fetch-site")
         origin = request.headers.get("origin")
         eigen = f"{request.url.scheme}://{request.headers.get('host')}"
-        if (site and site not in ("same-origin", "none")) or (origin and origin not in (eigen, "null")):
+        if (site and site not in ("same-origin", "none")) or (origin and origin != eigen):
             return Response("Verzoek van buiten Garage geweigerd", status_code=403)
+        try:
+            grootte = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            return Response("Ongeldig verzoek", status_code=400)
+        if grootte > (MAX_BACKUP if request.url.path == "/backup/terugzetten-bestand" else MAX_VERZOEK):
+            return render(request, "fout.html", status_code=413, fout="Dit bestand is te groot.")
     return await call_next(request)
 
 
 TOEGESTANE_HOSTS = {"127.0.0.1", "localhost", "testserver"}  # 'testserver' = de testclient
+MAX_VERZOEK = 200 * 1024 ** 2  # alle facturen van één beurt samen
+MAX_BACKUP = backup.MAX_GROOTTE
+
+# Inline scripts en handlers (onclick, onsubmit) zijn nodig voor de templates; de rest is dicht: geen framing
+# (clickjacking), geen verbindingen of formulieren naar buiten, geen plugins.
+CSP = "; ".join([
+    "default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: " + " ".join(f"https://{h}" for h in beeld.TOEGESTANE_HOSTS),
+    "frame-src https://sketchfab.com", "connect-src 'self'", "object-src 'none'", "base-uri 'none'",
+    "form-action 'self'", "frame-ancestors 'none'",
+])
+
+
+@app.middleware("http")
+async def beveiligingsheaders(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    # same-origin, niet no-referrer: bij no-referrer stuurt Chromium 'Origin: null' en dat weigert de CSRF-check
+    response.headers["Referrer-Policy"] = "same-origin"
+    if response.headers.get("content-type", "").startswith("text/html"):  # niet op PDF's: dat hindert de PDF-viewer
+        response.headers["Content-Security-Policy"] = CSP
+    return response
 
 
 @app.get("/gezond", include_in_schema=False)
@@ -163,6 +195,7 @@ def voertuig_detail(request: Request, vid: int):
         stalling = db.actieve_stalling(conn, vid)
         laatste_notitie = conn.execute("SELECT * FROM km_stand WHERE voertuig_id = ? ORDER BY datum DESC, id DESC LIMIT 1",
                                        (vid,)).fetchone()
+        sketchfab_auto = db.instelling(conn, "sketchfab_auto", "uit") == "aan"
     ongecontroleerd = [f for b in beurten for f in b["facturen"] if not f["gecontroleerd"]]
     info = _rdw_extra(v["rdw_json"])
     try:  # import: pas ruim na de eerste toelating (ergens anders) in Nederland op kenteken gezet
@@ -175,7 +208,7 @@ def voertuig_detail(request: Request, vid: int):
                   laatste_notitie=laatste_notitie, vandaag=date.today().isoformat(),
                   km_genoteerd=request.query_params.get("km"),
                   ongecontroleerd=ongecontroleerd, rdw_info=info, eigen_schema=bool(intervallen),
-                  importvoertuig=importvoertuig,
+                  importvoertuig=importvoertuig, sketchfab_auto=sketchfab_auto,
                   km_schatting=planning.km_schatting(v["voertuigsoort"], v["datum_eerste_toelating"])
                   if huidige_km is None else None)
 
@@ -268,14 +301,10 @@ def voertuig_export(vid: int, kosten: int = 1):
 def beeld_kiezen(request: Request, vid: int, q: str = ""):
     with db.connect() as conn:
         v = haal(conn, "voertuig", vid)
-    modellen, fotos, fout = [], [], None
-    try:
-        if q.strip():
-            modellen, fotos = beeld.zoek_3d(q.strip()), beeld.zoek_fotos(q.strip())
-        else:
-            modellen, fotos = beeld.zoek_alles(v["merk"], v["model"])
-    except beeld.BeeldFout as e:
-        fout = str(e)
+    if q.strip():
+        modellen, fotos, fout = beeld.zoek_beide(lambda: beeld.zoek_3d(q.strip()), lambda: beeld.zoek_fotos(q.strip()))
+    else:
+        modellen, fotos, fout = beeld.zoek_alles(v["merk"], v["model"])
     zoekterm = q.strip() or " ".join(filter(None, [v["merk"], v["model"]]))
     return render(request, "beeld.html", v=v, modellen=modellen, fotos=fotos, fout=fout, zoekterm=zoekterm)
 
@@ -450,14 +479,14 @@ def beurt_verwijderen(bid: int):
 
 # ---------- facturen ----------
 
-def _bestand(pad: str, mime: str, naam: str) -> FileResponse:
+def _bestand(pad: str, naam: str) -> FileResponse:
     try:
         bestand = db.bestand(pad)
     except ValueError:
         raise HTTPException(404, "Factuurbestand niet gevonden")
     if not bestand.is_file():
         raise HTTPException(404, "Factuurbestand ontbreekt op schijf")
-    return FileResponse(bestand, media_type=mime, filename=naam, content_disposition_type="inline")
+    return FileResponse(bestand, media_type=mime_voor(bestand), filename=naam, content_disposition_type="inline")
 
 
 @app.get("/facturen/{fid}")
@@ -465,14 +494,14 @@ def factuur_openen(fid: int):
     """De versie die gedeeld wordt: gelakt als dat gedaan is."""
     with db.connect() as conn:
         f = haal(conn, "factuur", fid)
-    return _bestand(f["pad"], f["mime_type"], f["originele_naam"])
+    return _bestand(f["pad"], f["originele_naam"])
 
 
 @app.get("/facturen/{fid}/origineel")
 def factuur_origineel(fid: int):
     with db.connect() as conn:
         f = haal(conn, "factuur", fid)
-    return _bestand(f["origineel_pad"] or f["pad"], f["mime_type"], f["originele_naam"])
+    return _bestand(f["origineel_pad"] or f["pad"], f["originele_naam"])
 
 
 @app.post("/facturen/{fid}/verwijderen")
@@ -583,7 +612,8 @@ def instellingen(request: Request, opgeslagen: int = 0):
     with db.connect() as conn:
         types = conn.execute("SELECT * FROM onderhoudstype ORDER BY naam = 'Overig', naam").fetchall()
         termen = db.instelling(conn, "prive_termen")
-        overig = {**extra.backup_context(conn), "herinneringen": db.instelling(conn, "herinneringen", "aan") == "aan"}
+        overig = {**extra.backup_context(conn), "herinneringen": db.instelling(conn, "herinneringen", "aan") == "aan",
+                  "sketchfab_auto": db.instelling(conn, "sketchfab_auto", "uit") == "aan"}
     groepen = [("*", "Alle voertuigen"), (db.MOTOR, "Motoren en brommers"), (db.AUTO, "Auto's en bedrijfsauto's"),
                *[(s, s) for s in VOERTUIGSOORTEN]]
     return render(request, "instellingen.html", types=types, groepen=groepen, termen=termen,

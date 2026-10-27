@@ -231,6 +231,8 @@ label.upload { font-size: .95rem; font-weight: 400; margin: 0; }
 .viewer .terugval { filter: blur(2px) brightness(.6); }
 .viewer .leeg-beeld { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--muted); }
 .viewer .leeg-beeld .i { width: 80px; height: 80px; stroke-width: 1; color: var(--dim); margin-bottom: 10px; }
+.viewer .laad-3d { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; }
+.viewer .laad-3d p { margin: 10px 0 0; font-size: .85rem; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
 .viewer .viewer-acties { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 8px; z-index: 2; }
 .viewer .viewer-acties .btn { background: var(--glas); backdrop-filter: blur(8px); }
 /* Sketchfab toont bij gratis modellen altijd een grote titel- en makerbalk (boven) en een logo (onder);

@@ -210,6 +210,7 @@ def actieve_stalling(conn: sqlite3.Connection, voertuig_id: int):
 
 
 GELDIG_PAD = re.compile(r"(facturen|beelden|documenten)/[\w.\-/]+")
+MIME_TYPES = {"application/pdf", "image/jpeg", "image/png"}  # gelijk aan de types in web.TOEGESTAAN
 
 
 def bestand(rel: str | None) -> Path:

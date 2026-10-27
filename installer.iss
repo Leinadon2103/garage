@@ -1,7 +1,7 @@
 ; Installatieprogramma voor Garage (Inno Setup 6). Bouwen: bouwen.bat
 ; Installeert per gebruiker (geen beheerdersrechten nodig) en registreert zich onder Instellingen > Apps.
 
-#define Versie "1.2.0"
+#define Versie "1.3.0"
 
 [Setup]
 AppId={{8E3B6C52-4D0B-4A8E-9C1F-6A2D7E5B9F10}
@@ -18,7 +18,7 @@ SetupIconFile=app\static\garage.ico
 UninstallDisplayIcon={app}\Garage.exe
 UninstallDisplayName=Garage
 WizardStyle=modern
-Compression=lzma2/max
+Compression=lzma2/ultra64
 SolidCompression=yes
 ; zolang Garage open is, vraagt (de)installeren om het eerst te sluiten
 AppMutex=Garage-Voertuigonderhoud

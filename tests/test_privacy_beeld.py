@@ -148,7 +148,12 @@ def test_beeld_kiezen_en_opslaan(client, monkeypatch):
 
     client.post(f"/voertuigen/{vid}/beeld", data={"soort": "3d", "uid": "a" * 32,
                                                   "thumb": "https://media.sketchfab.com/t.jpg", "titel": "Ninja"})
-    assert f"sketchfab.com/models/{'a' * 32}/embed" in client.get(f"/voertuigen/{vid}").text
+    pagina = client.get(f"/voertuigen/{vid}").text
+    # privacy: standaard pas na een klik verbinding met Sketchfab, tenzij je dat zelf aanzet
+    assert f"sketchfab.com/models/{'a' * 32}/embed" in pagina and 'id="laad-3d"' in pagina and "<iframe" not in pagina
+    client.post("/privacy", data={"sketchfab_auto": "1"})
+    pagina = client.get(f"/voertuigen/{vid}").text
+    assert "<iframe" in pagina and 'id="laad-3d"' not in pagina
     assert client.get(f"/voertuigen/{vid}/beeld.jpg").status_code == 200
     assert "beeld.jpg" in client.get("/").text
 
@@ -176,6 +181,21 @@ def test_beeld_zonder_internet(client, monkeypatch):
 
 
 # ---------- overig ----------
+
+def test_beeld_een_bron_faalt_andere_blijft_zichtbaar(client, monkeypatch):
+    def nep_get(url, **_):
+        if "wikimedia" in url:  # bijv. Wikimedia die een User-Agent weigert
+            return httpx.Response(403, request=httpx.Request("GET", url))
+        data = {"results": [{"uid": "b" * 32, "name": "Bandit 1200",
+                             "thumbnails": {"images": [{"url": "https://media.sketchfab.com/t.jpg", "width": 640}]}}]}
+        return httpx.Response(200, json=data, request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(beeld.httpx, "get", nep_get)
+    vid = voeg_voertuig_toe(client)
+    pagina = client.get(f"/voertuigen/{vid}/beeld").text
+    assert "Bandit 1200" in pagina and "weigert het verzoek (fout 403)" in pagina and "geen internet" not in pagina
+    assert beeld.zoektermen("SUZUKI", "GSF 600 BANDIT") == ["SUZUKI GSF 600 BANDIT", "SUZUKI GSF", "SUZUKI BANDIT"]
+
 
 def test_kenteken_opmaak_en_planningtekst():
     assert kenteken_opmaak("00MDB8") == "00-MDB-8"

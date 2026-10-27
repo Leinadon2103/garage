@@ -51,6 +51,13 @@ def data_map() -> Path:
     return documenten() / "Garage" if BEVROREN else HIER / "data"
 
 
+def log_naar(data: Path) -> None:
+    """app.log in de gegevensmap; hooguit 1 MB plus 2 oude delen, zodat het log niet blijft groeien."""
+    from logging.handlers import RotatingFileHandler
+    handler = RotatingFileHandler(data / "app.log", maxBytes=1024 ** 2, backupCount=2, encoding="utf-8")
+    logging.basicConfig(handlers=[handler], level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+
 def vrije_poort() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -182,7 +189,8 @@ class Api:
         if not keuze:
             return None  # geannuleerd
         doel = Path(keuze if isinstance(keuze, str) else keuze[0])
-        with urllib.request.urlopen(self.basis_url + pad, timeout=120) as r:
+        # bandit B310 mag hier: altijd http://127.0.0.1 + een pad dat hierboven is gecontroleerd
+        with urllib.request.urlopen(self.basis_url + pad, timeout=120) as r:  # nosec B310
             doel.write_bytes(r.read())
         return str(doel)
 
@@ -223,7 +231,7 @@ def controle() -> None:
     if not (data / "onderhoud.db").exists():
         return
     os.environ["ONDERHOUD_DATA"] = str(data)
-    logging.basicConfig(filename=data / "app.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    log_naar(data)
     sys.path.insert(0, str(HIER))
     try:
         from app import db, extra
@@ -248,7 +256,7 @@ def main() -> None:
     data = data_map()
     data.mkdir(parents=True, exist_ok=True)
     os.environ["ONDERHOUD_DATA"] = str(data)  # vóór het importeren van de app (db.DATA_DIR)
-    logging.basicConfig(filename=data / "app.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    log_naar(data)
     sys.path.insert(0, str(HIER))
     try:
         import webview

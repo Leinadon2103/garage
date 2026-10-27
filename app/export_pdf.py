@@ -15,12 +15,9 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Image as RLImage, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from . import db, lakken
+from .web import euro as _euro
 
 STYLES = getSampleStyleSheet()
-
-
-def _euro(bedrag) -> str:
-    return "" if bedrag is None else f"€ {bedrag:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def _km(km) -> str:

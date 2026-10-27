@@ -6,9 +6,17 @@
 <section class="hero">
   <div class="viewer">
     {% if v.beeld_type == "3d" %}
-      {% if v.beeld_pad %}<img src="/voertuigen/{{ v.id }}/beeld.jpg" alt="" class="terugval">{% endif %}
-      <iframe class="sketchfab" title="3D-model {{ v.beeld_titel }}" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen
-              src="https://sketchfab.com/models/{{ v.beeld_ref }}/embed?autostart=1&autospin=0.15&ui_theme=light&ui_infos=0&ui_watermark=0&ui_hint=0&dnt=1&preload=1"></iframe>
+      {% set embed = "https://sketchfab.com/models/" ~ v.beeld_ref ~ "/embed?autostart=1&autospin=0.15&ui_theme=light&ui_infos=0&ui_watermark=0&ui_hint=0&dnt=1&preload=1" %}
+      {% if v.beeld_pad %}<img src="/voertuigen/{{ v.id }}/beeld.jpg" alt="" id="voorbeeld-3d"{% if sketchfab_auto %} class="terugval"{% endif %}>{% endif %}
+      {% if sketchfab_auto %}
+      <iframe class="sketchfab" title="3D-model {{ v.beeld_titel }}" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen src="{{ embed }}"></iframe>
+      {% else %}
+      {# privacy: Sketchfab (VS) ziet je IP-adres pas als je zelf op laden klikt #}
+      <div class="laad-3d"><div>
+        <button type="button" class="btn" id="laad-3d" data-src="{{ embed }}" data-titel="3D-model {{ v.beeld_titel }}">{{ icon("rotate-3d") }} 3D-model laden</button>
+        <p>Het model wordt geladen van Sketchfab; die dienst ziet dan je IP-adres.</p>
+      </div></div>
+      {% endif %}
     {% elif v.beeld_pad %}
       <img src="/voertuigen/{{ v.id }}/beeld.jpg" alt="{{ v.beeld_titel or '' }}">
     {% else %}
@@ -181,6 +189,17 @@
 </section>
 
 <script>
+  {% if v.beeld_type == "3d" and not sketchfab_auto %}
+  // 3D-model pas na een klik laden (dan pas maakt de pagina verbinding met Sketchfab)
+  document.getElementById("laad-3d").addEventListener("click", e => {
+    const knop = e.currentTarget, frame = document.createElement("iframe");
+    Object.assign(frame, {className: "sketchfab", title: knop.dataset.titel, allowFullscreen: true, src: knop.dataset.src});
+    frame.allow = "autoplay; fullscreen; xr-spatial-tracking";
+    document.getElementById("voorbeeld-3d")?.classList.add("terugval");
+    knop.closest(".laad-3d").replaceWith(frame);
+  });
+  {% endif %}
+
   // In het Garage-programma: opslaan via een Windows 'Opslaan als'-venster (in een browser gewoon downloaden)
   const exportForm = document.querySelector("#export form"), exportMelding = document.getElementById("export-melding");
   exportForm.addEventListener("submit", async e => {

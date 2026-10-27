@@ -10,7 +10,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from . import backup, db, planning
-from .web import TOEGESTAAN, _of_400, getal, haal, lees_uploads, render, terug, verwijder_bestanden
+from .web import TOEGESTAAN, _of_400, getal, haal, lees_uploads, mime_voor, render, terug, verwijder_bestanden
 
 router = APIRouter()
 
@@ -194,7 +194,7 @@ def document_openen(did: int):
         raise HTTPException(404, "Bestand niet gevonden")
     if not pad.is_file():
         raise HTTPException(404, "Bestand ontbreekt op schijf")
-    return FileResponse(pad, media_type=d["mime_type"], filename=d["originele_naam"], content_disposition_type="inline")
+    return FileResponse(pad, media_type=mime_voor(pad), filename=d["originele_naam"], content_disposition_type="inline")
 
 
 @router.post("/documenten/{did}/verwijderen")
@@ -412,6 +412,13 @@ def herinneringen(aan: str = Form("")):
     with db.connect() as conn:
         db.zet_instelling(conn, "herinneringen", "aan" if aan else "uit")
     return terug("/instellingen?herinneringen=opgeslagen#herinneringen")
+
+
+@router.post("/privacy")
+def privacy(sketchfab_auto: str = Form("")):
+    with db.connect() as conn:
+        db.zet_instelling(conn, "sketchfab_auto", "aan" if sketchfab_auto else "uit")
+    return terug("/instellingen?privacy=opgeslagen#privacy")
 
 
 def controle_meldingen() -> list[str]:

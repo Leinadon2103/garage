@@ -133,9 +133,11 @@ def _controleer_database(pad: Path) -> None:
             kolommen = {r[1] for r in test.execute("PRAGMA table_info(factuur)")}
             if {"pad", "origineel_pad"} <= kolommen and test.execute(
                     "SELECT 1 FROM sqlite_master WHERE name = 'document'").fetchone():
-                ok = not db.ongeldige_paden(test)
+                ok = not db.ongeldige_paden(test) and all(r[0] in db.MIME_TYPES for r in test.execute(
+                    "SELECT mime_type FROM factuur UNION ALL SELECT mime_type FROM document"))
             else:  # back-up van een oudere versie: alleen de kolommen die er zijn
-                ok = all(db.GELDIG_PAD.fullmatch(r[0] or "") for r in test.execute("SELECT pad FROM factuur"))
+                ok = all(db.GELDIG_PAD.fullmatch(r[0] or "") and r[1] in db.MIME_TYPES
+                         for r in test.execute("SELECT pad, mime_type FROM factuur"))
     except sqlite3.DatabaseError:
         ok = False
     finally:

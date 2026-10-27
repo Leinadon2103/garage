@@ -366,6 +366,16 @@ def test_andere_websites_kunnen_niets_wijzigen_of_lezen(client):
     # eigen pagina's mogen wel
     assert client.post("/weergave", data={"thema": "licht"}, headers={"origin": "http://testserver",
                                                                      "sec-fetch-site": "same-origin"}).status_code == 200
+    # 'Origin: null' komt o.a. uit een sandboxed iframe van een andere site
+    assert client.post("/weergave", data={"thema": "donker"}, headers={"origin": "null"}).status_code == 403
+
+
+def test_te_groot_verzoek_geweigerd(client):
+    vid = voeg_voertuig_toe(client)
+    groot = {"content-length": str(200 * 1024 ** 2 + 1)}
+    assert client.post(f"/voertuigen/{vid}/km", data={"kilometerstand": "1"}, headers=groot).status_code == 413
+    assert client.post(f"/voertuigen/{vid}/km", data={"kilometerstand": "1"}, headers={"content-length": "x"}).status_code == 400
+    assert eerste("km_stand") is None
 
 
 def test_bestandspaden_buiten_de_gegevensmap_geweigerd(client, tmp_path):
@@ -383,6 +393,35 @@ def test_bestandspaden_buiten_de_gegevensmap_geweigerd(client, tmp_path):
         conn.execute("UPDATE factuur SET pad = 'facturen/1/x.pdf'")
     with pytest.raises(backup.BackupFout, match="ongeldige gegevens"):
         backup.herstel(kwaad)
+
+
+def test_mime_type_uit_extensie_en_back_up_met_html_geweigerd(client):
+    """Een 'factuur' die in de database text/html heet, mag nooit als webpagina binnen Garage draaien."""
+    vid = voeg_voertuig_toe(client)
+    nieuwe_beurt(client, vid, files=[("facturen", ("f.pdf", pdf_bytes(), "application/pdf"))])
+    client.post(f"/voertuigen/{vid}/documenten", data={"soort": "Overig"},
+                files={"bestand": ("d.pdf", pdf_bytes(), "application/pdf")})
+    with db.connect() as conn:
+        conn.execute("UPDATE factuur SET mime_type = 'text/html'")
+        conn.execute("UPDATE document SET mime_type = 'text/html'")
+    f, d = eerste("factuur"), eerste("document")
+    for url in (f"/facturen/{f['id']}", f"/facturen/{f['id']}/origineel", f"/documenten/{d['id']}"):
+        assert client.get(url).headers["content-type"] == "application/pdf"
+    kwaad = backup.maak()
+    with pytest.raises(backup.BackupFout, match="ongeldige gegevens"):
+        backup.herstel(kwaad)
+
+
+def test_beveiligingsheaders(client):
+    vid = voeg_voertuig_toe(client)
+    nieuwe_beurt(client, vid, files=[("facturen", ("f.pdf", pdf_bytes(), "application/pdf"))])
+    pagina = client.get(f"/voertuigen/{vid}")
+    csp = pagina.headers["content-security-policy"]
+    assert "frame-ancestors 'none'" in csp and "connect-src 'self'" in csp and "object-src 'none'" in csp
+    pdf = client.get(f"/facturen/{eerste('factuur')['id']}")
+    assert "content-security-policy" not in pdf.headers  # PDF-viewer niet hinderen
+    for r in (pagina, pdf, client.get("/", headers={"host": "evil.example"})):
+        assert r.headers["x-content-type-options"] == "nosniff" and r.headers["x-frame-options"] == "DENY"
 
 
 def test_geen_netwerkmap_en_back_upmap_niet_uit_back_up(client, tmp_path):

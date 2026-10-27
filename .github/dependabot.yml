@@ -1,0 +1,9 @@
+# Wekelijks controleren op nieuwe versies (en beveiligingsupdates) van de vastgelegde pakketten.
+# Dependabot werkt requirements.in bij en genereert requirements.txt opnieuw met pip-compile.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

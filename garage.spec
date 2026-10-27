@@ -11,6 +11,11 @@ a = Analysis(
     hiddenimports=collect_submodules("uvicorn") + collect_submodules("app") + ["clr"],
     excludes=["tests", "pytest", "tkinter"],
 )
+# Pillow-onderdelen die Garage niet gebruikt (AVIF, FreeType-lettertypen, kleurprofielen, Tk): scheelt ca. 10 MB.
+# Pillow vangt het ontbreken zelf af; Garage leest alleen JPG/PNG en tekent alleen rechthoeken.
+PIL_OVERBODIG = {"_avif", "_imagingft", "_imagingcms", "_imagingtk"}
+a.binaries = [b for b in a.binaries if not (b[0].replace("\\", "/").startswith("PIL/")
+                                             and b[0].replace("\\", "/")[4:].split(".")[0] in PIL_OVERBODIG)]
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, [],

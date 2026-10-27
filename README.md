@@ -3,7 +3,7 @@
 Een app voor op je eigen computer om het onderhoud van je motor, auto of ander voertuig bij te houden. Je bewaart er ook je facturen in, en bij verkoop maak je er een PDF mee met de complete historie.
 
 ## Installeren
-Voer `build\installer\Garage-installatie-1.0.0.exe` uit. Je hebt geen beheerdersrechten nodig.
+Voer `build\installer\Garage-installatie-<versie>.exe` uit. Je hebt geen beheerdersrechten nodig.
 
 Daarna staat **Garage** in het startmenu, en desgewenst ook op het bureaublad. Garage is een eigen Windows-programma met een eigen venster en icoon. De schermen worden getoond met WebView2, dat standaard in Windows 11 zit.
 
@@ -12,10 +12,19 @@ Daarna staat **Garage** in het startmenu, en desgewenst ook op het bureaublad. G
 ## Gegevens en back-up
 Het geïnstalleerde programma bewaart alles in **Documenten\Garage**: de database (`onderhoud.db`), de facturen en de voertuigafbeeldingen. Maak een back-up door die map te kopiëren.
 
+Welke gegevens Garage bewaart en wat er naar buiten gaat, staat in [PRIVACY.md](PRIVACY.md) en in de app bij *Instellingen > Privacy*.
+
 ## Ontwikkelen en bouwen
 - `start.bat` start de app in je browser, met de gegevens in `data\` van deze projectmap.
 - Met `.venv\Scripts\pythonw.exe Garage.pyw` start je hem in een eigen venster, ook met de gegevens in `data\`.
+- **Pakketten** staan met vaste versies en hashes in `requirements.txt` (app en tests) en `requirements-bouwen.txt` (PyInstaller, pip-audit). Pas `requirements.in` of `requirements-bouwen.in` aan en genereer daarna opnieuw:
+  ```
+  .venv\Scripts\pip-compile --generate-hashes --strip-extras -o requirements.txt requirements.in
+  .venv\Scripts\pip-compile --generate-hashes --strip-extras --allow-unsafe -o requirements-bouwen.txt requirements-bouwen.in
+  ```
+  Dependabot (`.github/dependabot.yml`) meldt wekelijks nieuwe versies.
 - `bouwen.bat` doet het volgende:
+  - controleert de pakketten op bekende lekken (`pip-audit`) en de code op onveilige constructies (`bandit`, via `uvx`; [uv](https://docs.astral.sh/uv/) is dus nodig);
   - draait de tests;
   - bouwt `Garage.exe` met PyInstaller;
   - bouwt het installatieprogramma met Inno Setup 6, in `build\installer\`. Pas het versienummer aan in `installer.iss` en `tools\versie.txt`.
@@ -44,3 +53,6 @@ Zolang je zelf nog geen km-stand hebt ingevoerd, zie je een ruwe schatting: de l
 ```
 .venv\Scripts\python -m pytest
 ```
+
+## Licentie
+AGPL-3.0, zie [LICENSE](LICENSE). Waarom, en de licenties van de gebruikte pakketten: [LICENTIES.md](LICENTIES.md).

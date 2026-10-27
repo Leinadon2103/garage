@@ -10,7 +10,9 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
-from . import db, export_pdf
+from . import db
+
+lazy from . import export_pdf  # reportlab/pypdf pas laden bij de eerste upload of export (sneller opstarten)
 
 HIER = Path(__file__).resolve().parent
 # extensie -> (mime-type, eerste bytes van het bestand)
@@ -23,12 +25,16 @@ TOEGESTAAN = {
 VOERTUIGSOORTEN = ["Motorfiets", "Bromfiets", "Personenauto", "Bedrijfsauto", "Aanhangwagen", "Overig"]
 
 
+def euro(bedrag) -> str:
+    return "" if bedrag is None else f"€ {bedrag:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 templates = Jinja2Templates(directory=HIER / "templates")
 templates.env.filters["km"] = lambda v: "" if v is None else f"{v:,}".replace(",", ".")
-templates.env.filters["euro"] = export_pdf._euro
+templates.env.filters["euro"] = euro
 templates.env.filters["nl_datum"] = lambda d: (date.fromisoformat(d) if isinstance(d, str) else d).strftime("%d-%m-%Y") if d else ""
-templates.env.globals["icon"] = lambda naam, klasse="": Markup(
-    f'<svg class="i {klasse}" aria-hidden="true"><use href="/static/icons.svg#i-{naam}"/></svg>')
+templates.env.globals["icon"] = lambda naam, klasse="": Markup(  # format() escapet naam en klasse
+    '<svg class="i {}" aria-hidden="true"><use href="/static/icons.svg#i-{}"/></svg>').format(klasse, naam)
 templates.env.globals["soort_icoon"] = {"Motorfiets": "bike", "Bromfiets": "bike", "Personenauto": "car",
                                         "Bedrijfsauto": "truck", "Aanhangwagen": "truck"}
 
@@ -61,11 +67,24 @@ def terug(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
 
+TABELLEN = {"voertuig", "beurt", "factuur", "document", "km_stand", "stalling"}
+
+
 def haal(conn, tabel: str, id_: int):
-    rij = conn.execute(f"SELECT * FROM {tabel} WHERE id = ?", (id_,)).fetchone()
+    if tabel not in TABELLEN:  # tabelnaam kan geen ?-parameter zijn; daarom alleen vaste namen
+        raise ValueError(f"Onbekende tabel: {tabel}")
+    rij = conn.execute(f"SELECT * FROM {tabel} WHERE id = ?", (id_,)).fetchone()  # nosec B608
     if not rij:
         raise HTTPException(404, f"{tabel} niet gevonden")
     return rij
+
+
+def mime_voor(pad: Path) -> str:
+    """Mime-type uit de extensie, nooit uit de database: een teruggezette back-up kan daar bijv. text/html in
+    zetten, en dan zou een 'factuur' als webpagina binnen Garage draaien."""
+    if pad.suffix.lower() not in TOEGESTAAN:
+        raise HTTPException(404, "Onbekend bestandstype")
+    return TOEGESTAAN[pad.suffix.lower()][0]
 
 
 def getal(waarde: str | None) -> int | None:

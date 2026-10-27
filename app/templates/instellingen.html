@@ -81,6 +81,28 @@
   </form>
 </section>
 
+<section class="card" id="privacy" style="margin-top:16px">
+  <h2>{{ icon("shield-check") }} Privacy: waar gaan je gegevens heen?</h2>
+  {% if melding.privacy %}<div class="melding ok">{{ icon("check") }}<p>Opgeslagen.</p></div>{% endif %}
+  <p class="muted">Garage heeft geen account en geen eigen server. Alles staat op deze computer, in de map van je gegevens.
+    De maker van Garage krijgt niets binnen. Alleen dit gaat naar buiten, en alleen als je die functie gebruikt:</p>
+  <div class="tabel-wrap"><table>
+    <thead><tr><th>Wanneer</th><th>Wat gaat er heen</th><th>Naar</th></tr></thead>
+    <tbody>
+      <tr><td>Voertuig opzoeken of RDW-gegevens vernieuwen</td><td>Het kenteken en je IP-adres</td><td>RDW Open Data (Nederland)</td></tr>
+      <tr><td>Beeld zoeken en kiezen</td><td>Merk en model (of je eigen zoekterm) en je IP-adres</td><td>Sketchfab en Wikimedia Commons (VS)</td></tr>
+      <tr><td>3D-model bekijken</td><td>Je IP-adres, zoals bij elke website</td><td>Sketchfab (VS)</td></tr>
+      <tr><td>Back-up naar OneDrive of een andere cloudmap</td><td>Alles, ook de niet-gelakte originelen</td><td>De cloudmap die je kiest</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted" style="font-size:.9rem">Tekstherkenning (OCR) gebeurt met de ingebouwde Windows-OCR, op deze computer. Staat je map Documenten in OneDrive,
+    dan staan je gegevens daar ook. De verkoop-PDF bevat alleen de gelakte facturen.</p>
+  <form method="post" action="/privacy" class="rij">
+    <label class="checkbox"><input type="checkbox" name="sketchfab_auto" value="1" {% if sketchfab_auto %}checked{% endif %}> 3D-modellen meteen laden (anders pas na een klik)</label>
+    <button class="btn ghost klein">Opslaan</button>
+  </form>
+</section>
+
 <section class="sectie" id="types">
   <h2>{{ icon("wrench") }} Onderhoudstypes en standaardintervallen (vuistregels)</h2>
   <p class="muted">Deze algemene vuistregels gelden voor elk voertuig zonder eigen schema. Het schema voor een specifiek voertuig
