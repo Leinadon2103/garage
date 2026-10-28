@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 
-from . import backup, crypto, db, extra, image, planning
+from . import backup, crypto, db, extra, fuel, image, planning
 
 # load only when a screen needs them: PyMuPDF, reportlab, pypdf and httpx make the startup slow otherwise
 lazy from . import export_pdf, invoice_reader, rdw, redaction
@@ -245,6 +245,7 @@ def vehicle_detail(request: Request, vid: int):
         last_reading = conn.execute("SELECT * FROM odometer_reading WHERE vehicle_id = ? ORDER BY date DESC, id DESC LIMIT 1",
                                     (vid,)).fetchone()
         sketchfab_autoload = db.setting(conn, "sketchfab_autoload", "off") == "on"
+        fuel_average = fuel.consumption(extra.fuel_entries(conn, vid))["average"]
     unreviewed = [f for s in services for f in s["invoices"] if not f["reviewed"]]
     info = _rdw_extra(v["rdw_json"])
     try:  # import: registered in the Netherlands well after the first registration (somewhere else)
@@ -253,7 +254,7 @@ def vehicle_detail(request: Request, vid: int):
     except (KeyError, TypeError, ValueError):
         imported = False
     return render(request, "vehicle.html", v=v, services=services, current_km=current_km,
-                  planning=plan, specs=specs, doc_count=doc_count, storage=storage,
+                  planning=plan, specs=specs, doc_count=doc_count, storage=storage, fuel_average=fuel_average,
                   last_reading=last_reading, today=date.today().isoformat(),
                   km_saved=request.query_params.get("km"),
                   unreviewed=unreviewed, rdw_info=info, custom_schedule=bool(intervals),

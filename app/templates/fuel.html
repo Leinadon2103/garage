@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Tanken{% endblock %}
+{% macro dec(value, digits=1) %}{{ ("%." ~ digits ~ "f")|format(value)|replace(".", ",") }}{% endmacro %}
+{% block content %}
+<a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
+<div class="header"><div><div class="eyebrow">{{ v.license_plate|plate }}</div><h1>Tanken en verbruik</h1>
+  <p class="muted">Tank je steeds vol, dan rekent Garage het verbruik precies uit: van volle tank tot volle tank.
+    Een keer niet volgetankt? Haal dan het vinkje weg; die liters tellen mee bij de volgende volle tank.
+    De km-stand bij het tanken telt ook mee voor je onderhoudsplanning.</p></div></div>
+
+{% if saved %}<div class="notice ok">{{ icon("check") }}<p>Tankbeurt opgeslagen.</p></div>{% endif %}
+
+<div class="card key-figures">
+  <div><small class="muted">Gemiddeld verbruik</small><strong>{{ (dec(stats.average) ~ " l/100 km") if stats.average else "–" }}</strong>
+    <small class="muted">{{ ("1 op " ~ dec(km_per_liter) ~ " · over " ~ (stats.km|int|km) ~ " km") if stats.average else "na twee keer voltanken" }}</small></div>
+  <div><small class="muted">Laatste keer</small><strong>{{ (dec(stats.last) ~ " l/100 km") if stats.last else "–" }}</strong>
+    <small class="muted">van volle tank tot volle tank</small></div>
+  <div><small class="muted">Gemiddelde literprijs</small><strong>{{ ("€ " ~ dec(stats.price_per_liter, 3)) if stats.price_per_liter else "–" }}</strong>
+    <small class="muted">{{ dec(stats.liters, 0) }} liter getankt</small></div>
+  <div><small class="muted">Brandstof totaal</small><strong>{{ stats.cost|euro if stats.cost else "–" }}</strong>
+    <small class="muted"><a href="/vehicles/{{ v.id }}/costs">kosten per km →</a></small></div>
+</div>
+
+<form method="post" class="card" style="margin-top:16px">
+  <h2>{{ icon("fuel") }} Tankbeurt toevoegen</h2>
+  <div class="fields">
+    <div class="field"><label for="fuel-date">Datum</label><input id="fuel-date" type="date" name="date" value="{{ today }}" max="{{ today }}" required></div>
+    <div class="field"><label for="fuel-km">Km-stand</label><input id="fuel-km" type="number" name="odometer_km" min="0"
+      placeholder="{{ (current_km|km) if current_km else '' }}" required></div>
+    <div class="field"><label for="fuel-liters">Liters</label><input id="fuel-liters" name="liters" inputmode="decimal" placeholder="bijv. 14,62" required></div>
+    <div class="field"><label for="fuel-cost">Bedrag (optioneel)</label><input id="fuel-cost" name="cost" inputmode="decimal" placeholder="bijv. 28,45"></div>
+    <div class="field"><label for="fuel-note">Opmerking (optioneel)</label><input id="fuel-note" name="note" placeholder="bijv. Shell A12, vakantierit"></div>
+  </div>
+  <label class="checkbox" style="margin:4px 0 14px"><input type="checkbox" name="full_tank" value="1" checked> Volgetankt</label>
+  <button class="btn">{{ icon("plus") }} Opslaan</button>
+</form>
+
+<section class="section">
+  <h2>{{ icon("gauge") }} Tankbeurten</h2>
+  {% if entries %}
+  <div class="card table-wrap"><table>
+    <thead><tr><th>Datum</th><th>Km-stand</th><th>Liters</th><th>Bedrag</th><th>Per liter</th><th>Verbruik</th><th></th></tr></thead>
+    <tbody>
+    {% for e in entries %}
+    <tr>
+      <td>{{ e.date|short_date }}{% if e.note %}<br><small class="muted">{{ e.note }}</small>{% endif %}</td>
+      <td>{{ e.odometer_km|km }}</td>
+      <td>{{ dec(e.liters, 2) }}{% if not e.full_tank %} <span class="chip" title="Niet volgetankt: telt mee bij de volgende volle tank">deels</span>{% endif %}</td>
+      <td>{{ e.cost|euro if e.cost is not none else "–" }}</td>
+      <td class="muted">{{ ("€ " ~ dec(e.cost / e.liters, 3)) if e.cost else "–" }}</td>
+      <td>{% if e.id in stats.per_entry %}{{ dec(stats.per_entry[e.id]) }} l/100 km{% else %}<span class="muted">–</span>{% endif %}</td>
+      <td><form method="post" action="/fuel/{{ e.id }}/delete" onsubmit="return confirm('Deze tankbeurt verwijderen?')">
+        <button class="link-button" aria-label="Verwijderen">{{ icon("trash-2") }}</button></form></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="muted">Nog geen tankbeurten.</p>{% endif %}
+</section>
+{% endblock %}

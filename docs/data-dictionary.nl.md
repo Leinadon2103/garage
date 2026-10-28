@@ -4,7 +4,7 @@
 
 Betekenis van elke tabel en kolom in `onderhoud.db`, met toegestane waarden en herkomst. Waar een gegeven staat en hoe gevoelig het is, staat in het [gegevensregister](data-register.nl.md). Nederlandse termen en hun Engelse namen: [woordenlijst](glossary.md).
 
-Stand: schemaversie 3 (`PRAGMA user_version`). De test `tests/test_data_dictionary.py` faalt als een kolom in de database hier ontbreekt (in beide talen); voeg bij een nieuwe migratie dus ook de kolommen hier toe.
+Stand: schemaversie 4 (`PRAGMA user_version`). De test `tests/test_data_dictionary.py` faalt als een kolom in de database hier ontbreekt (in beide talen); voeg bij een nieuwe migratie dus ook de kolommen hier toe.
 
 ## Afspraken
 - **Namen** in de database zijn Engels (sinds migratie 2). **Waarden** die de gebruiker ziet blijven Nederlands: voertuigsoorten (van de RDW), documentsoorten, namen van onderhoudstypes en specificaties.
@@ -130,6 +130,20 @@ Losse km-registratie, buiten een beurt om.
 | `odometer_km` | INTEGER, verplicht | Km-stand | ≥ 0; moet passen in het km-verloop | handmatig |
 | `note` | TEXT | Opmerking | vrij of NULL | handmatig |
 
+### fuel_entry
+Tankbeurt (F2). Telt mee in het km-verloop; het verbruik rekent `fuel.consumption` uit van volle tank tot volle tank.
+
+| Kolom | Type | Betekenis | Toegestane waarden | Herkomst |
+|---|---|---|---|---|
+| `id` | INTEGER | Sleutel | | automatisch |
+| `vehicle_id` | INTEGER, verplicht | Voertuig | bestaande `vehicle.id` | app |
+| `date` | TEXT, verplicht | Datum van het tanken | ISO-datum, niet in de toekomst | handmatig (standaard vandaag) |
+| `odometer_km` | INTEGER, verplicht | Km-stand bij het tanken | ≥ 0; moet passen in het km-verloop | handmatig |
+| `liters` | REAL, verplicht | Getankte liters | > 0 en ≤ 1000 | handmatig |
+| `cost` | REAL | Bedrag in euro's | ≥ 0 of NULL | handmatig |
+| `full_tank` | INTEGER, verplicht | Volgetankt | 1 (standaard) of 0; bij 0 tellen de liters mee bij de volgende volle tank | handmatig |
+| `note` | TEXT | Opmerking, bijv. tankstation | vrij of NULL | handmatig |
+
 ### storage_period
 Stallingsperiode waarin het voertuig stilstaat (bijv. winterstalling). Tijdens een stalling worden geen herinneringen gestuurd.
 
@@ -213,5 +227,6 @@ Bronnen: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) en *Bra
 | 1 | `db._migration_1` | Basis: het schema van Garage 1.3.0 (Nederlandse namen). Werkt ook op oudere databases zonder versienummer (vult ontbrekende tabellen en kolommen aan). |
 | 2 | `db._migration_2` | Engelse namen voor tabellen, kolommen, instellingssleutels en interne waarden (`RENAMES_2` en verwant). Waarden die de gebruiker ziet blijven Nederlands. |
 | 3 | `db._migration_3` | Tabel `file_key` voor de versleuteling (P1). De bestaande bestanden en velden versleutelt `db.encrypt_existing()` bij de start, niet de migratie. |
+| 4 | `db._migration_4` | Tabel `fuel_entry` voor tankbeurten en verbruik (F2). |
 
 Een nieuwe migratie komt achteraan in `db.MIGRATIONS` en krijgt hier een regel. Gegevens van een nieuwere versie dan de app kent, worden niet geopend en niet teruggezet.

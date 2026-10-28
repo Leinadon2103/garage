@@ -4,7 +4,7 @@
 
 Meaning of every table and column in `onderhoud.db`, with allowed values and origin. Where data is stored and how sensitive it is, is in the [data register](data-register.md). Dutch terms and their English names: [glossary](glossary.md).
 
-Status: schema version 3 (`PRAGMA user_version`). The test `tests/test_data_dictionary.py` fails if a column in the database is missing here (in both languages); so with a new migration, add the columns here too.
+Status: schema version 4 (`PRAGMA user_version`). The test `tests/test_data_dictionary.py` fails if a column in the database is missing here (in both languages); so with a new migration, add the columns here too.
 
 ## Conventions
 - **Names** in the database are English (since migration 2). **Values** the user sees stay Dutch: vehicle types (from the RDW), document kinds, names of maintenance types and specs.
@@ -130,6 +130,20 @@ Separate odometer reading, outside a service.
 | `odometer_km` | INTEGER, required | Reading | ≥ 0; must fit the odometer history | manual |
 | `note` | TEXT | Explanation | free or NULL | manual |
 
+### fuel_entry
+Fill-up (F2). Counts in the odometer history; `fuel.consumption` works out the consumption from full tank to full tank.
+
+| Column | Type | Meaning | Allowed values | Origin |
+|---|---|---|---|---|
+| `id` | INTEGER | Key | | automatic |
+| `vehicle_id` | INTEGER, required | Vehicle | existing `vehicle.id` | app |
+| `date` | TEXT, required | Date of the fill-up | ISO date, not in the future | manual (default today) |
+| `odometer_km` | INTEGER, required | Reading at the fill-up | ≥ 0; must fit the odometer history | manual |
+| `liters` | REAL, required | Litres put in | > 0 and ≤ 1000 | manual |
+| `cost` | REAL | Amount in euros | ≥ 0 or NULL | manual |
+| `full_tank` | INTEGER, required | Filled up completely | 1 (default) or 0; with 0 the litres count at the next full tank | manual |
+| `note` | TEXT | Note, e.g. the petrol station | free or NULL | manual |
+
 ### storage_period
 Period in which the vehicle is stored (e.g. winter storage). No reminders are sent during storage.
 
@@ -213,5 +227,6 @@ Sources: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) and *Br
 | 1 | `db._migration_1` | Baseline: the schema of Garage 1.3.0 (Dutch names). Also works on older databases without a version number (adds missing tables and columns). |
 | 2 | `db._migration_2` | English names for tables, columns, setting keys and internal values (`RENAMES_2` and related). Values the user sees stay Dutch. |
 | 3 | `db._migration_3` | Table `file_key` for encryption (P1). The existing files and fields are encrypted by `db.encrypt_existing()` at startup, not by the migration. |
+| 4 | `db._migration_4` | Table `fuel_entry` for fill-ups and fuel consumption (F2). |
 
 A new migration goes at the end of `db.MIGRATIONS` and gets a row here. Data of a newer version than the app knows is not opened and not restored.

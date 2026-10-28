@@ -72,7 +72,7 @@ def redirect(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
 
-TABLES = {"vehicle", "service", "invoice", "document", "odometer_reading", "storage_period"}
+TABLES = {"vehicle", "service", "invoice", "document", "odometer_reading", "storage_period", "fuel_entry"}
 
 
 def fetch(conn, table: str, id_: int):

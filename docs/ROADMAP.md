@@ -19,7 +19,7 @@ Status: October 2026, after version 1.3.0. This document is the handover to a ne
 - Redaction is real (`apply_redactions` + `scrub`). An unreviewed invoice never ends up in the sale PDF. EXIF is removed from photos.
 - A privacy overview in the app and in `PRIVACY.md`. Sketchfab only loads after a click.
 - Packages are pinned with hashes, with pip-audit, bandit and Dependabot (also for the GitHub Actions). License AGPL-3.0, with `LICENSES.md`.
-- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10, G9 and K3, and the conversion to English code (migration 2). CI runs on GitHub; the repo is public and `main` is protected (see Working agreements).
+- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10, G9 and K3, and the conversion to English code (migration 2). Then encryption of files, sensitive fields and backups with recovery through the backup password (P1, P2, P8; [encryption.md](encryption.md)) and fill-ups with fuel consumption (F2). Schema version 4. CI runs on GitHub; the repo is public and `main` is protected (see Working agreements).
 
 ## Legal framework (estimate, not legal advice)
 - For personal use, Garage falls under the **household exemption** (Art. 2(2)(c) GDPR).
@@ -63,7 +63,7 @@ Done is ~~struck through~~.
 | **S1** | Strict CSP: move all `onclick`/`onsubmit` to `static/app.js`, then `script-src 'self'` | Injected code can then no longer run | medium |
 | ~~**S2**~~ | ~~GitHub Actions (Windows runner): tests, pip-audit and bandit on every push and Dependabot PR~~ | Dependabot PRs were not tested anywhere | done |
 | ~~**S3**~~ | ~~Smoke test of the exe: `Garage.exe --self-test`, in `build.bat`~~ | The built exe was never tested automatically | done |
-| **S4** | A random session token in a cookie, set through the start URL | Other Windows users on the same pc can now reach the server | small |
+| **S4** | A random session token in a cookie, set through the start URL | Other Windows users on the same pc can now reach the server, and it hands out decrypted files: P1 protects the disk, not the running app | small |
 | **S5** | Signing the exe (Azure Trusted Signing, about €10 per month), SHA-256 with releases, `SECURITY.md` | Authenticity for users, no SmartScreen warning | medium, costs money |
 | **S6** | Open PDFs in a separate process with a time limit | A malicious PDF can then not make the app hang or crash | medium |
 
@@ -71,7 +71,7 @@ Done is ~~struck through~~.
 | Code | What | Value | Size |
 |---|---|---|---|
 | **F1** | Calendar export (`.ics`) of planned maintenance, APK and expiring documents | Reminders in your own calendar, fully offline | small |
-| **F2** | Refuelling and consumption (l/100 km, km/l), cost per km including fuel | A popular feature in maintenance apps; a more complete cost picture | medium |
+| ~~**F2**~~ | ~~Refuelling and consumption (l/100 km, km/l), cost per km including fuel~~ | A popular feature in maintenance apps; a more complete cost picture | done |
 | **F3** | APK history and defects from RDW Open Data, and details of recalls | More value in the sale PDF, without extra personal data | medium |
 | **F4** | Search and filter in the history (type, garage, period, amount) | Convenience with a long history | small |
 | **F5** | Total cost of ownership (TCO): depreciation, insurance, tax and maintenance per year | Insight | medium |
@@ -79,11 +79,13 @@ Done is ~~struck through~~.
 | **F7** | Parts and consumables (oil, filters) with part numbers; list "needed for the next service" | Practical for people who work on their own vehicle | medium |
 | **F8** | Notify about a new version through GitHub Releases, only with consent | Updates without telemetry | small |
 | **F9** | Accessibility (WCAG 2.2: keyboard, contrast, screen reader) | Quality, and needed if others start using the app | medium |
+| **F10** | Entry on the go: fill-ups, odometer readings and invoice photos from the phone. Option a: an import folder (e.g. in OneDrive) that Garage picks up, encrypts and empties. Option b: pairing over the local network with a QR code and a one-time token, only while the screen is open (requires S4 and a threat model in K6) | Fill-ups and invoices happen away from the pc and are otherwise forgotten; F2 makes this more pressing. Option a briefly leaves the original unencrypted in the cloud | medium |
+| **F11** | Recycle bin: deleted services, invoices and documents stay encrypted for 30 days, then are really erased (period via P7) | With `secure_delete` and crypto-shredding a wrong click is final; only a backup of up to a week old helps | medium |
 
 ### Code quality and professionalisation
 | Code | What | Why | Size |
 |---|---|---|---|
-| **K1** | Split `main.py` into routers per subject: vehicles, services, invoices, image | Overview; the file is about 500 lines | medium |
+| **K1** | Split `main.py` into routers per subject: vehicles, services, invoices, image | Overview; the file is about 700 lines | medium |
 | **K2** | `ruff` (formatting and lint) and a type check (`pyright`) in `build.bat` and CI | Catch errors earlier | small |
 | ~~**K3**~~ | ~~Verify a backup after making it: open the zip and run `PRAGMA integrity_check`~~ | The backup is the only copy of the originals; P2 builds on it | done |
 | **K4** | Build the exe and installer in CI, with SHA-256 and a GitHub artifact attestation | Provably built from this source code; the free part of S5 | medium |
@@ -96,16 +98,17 @@ Done is ~~struck through~~.
 
 ## Suggested order
 1. ~~**Foundation:** S2, S3, G1, G2, G3.~~ Done, together with P9, P10, G9 and the conversion to English code.
-2. **Biggest privacy gain:** ~~K3~~, ~~P1 + P2~~ (done), then P3, P4 and P6.
+2. **Biggest privacy gain:** ~~K3~~, ~~P1 + P2~~ (done), then S4 (moved up: without it P1 does not protect against other users on the same pc), then P3, P4 and P6.
 3. **Trust for the buyer:** G4, G6, G7, and with it F3.
-4. **Finishing:** S1, P5, P7, ~~P8~~ (done, with P1), G5, G8, S4, K1, K2.
-5. **Professionalisation, spread out:** K4 to K9.
-6. **Features by choice:** F1, F2 and F4 are quick and valuable; the rest on request.
+4. **Finishing:** S1, P5, P7 with F11, ~~P8~~ (done, with P1), G5, G8, K1, K2.
+5. **Professionalisation, spread out:** K4 to K9. If the app goes to others: K4, K5 and F8 together as a release pipeline, before S5 and F9.
+6. **Features, chosen by Daniel (October 2026):** ~~F2~~ (done), then F1, F4 and F3, each as its own PR. After that F10, which has the most value for daily use (decision 7 first); the rest on request.
 
 ## Open decisions for Daniel
 1. ~~Will the GitHub repo be public?~~ Yes, the repo is public. Still open: will the app be actively given to others? That decides S5, F8 and F9.
 2. ~~P1: DPAPI or an own password?~~ Decided: DPAPI for the data on this pc (P1), a password on the backup (P2), so a restore on another pc works. Worked out in K6.
 3. P3: after a sale erase everything or keep an anonymised archive?
-4. Which features (F1 to F9) are preferred?
+4. ~~Which features are preferred?~~ Decided: F2, F1, F4 and F3, in that order (see Suggested order, step 6).
 5. Does Python 3.15 remain the base? The ecosystem is still catching up (see pyyaml, Dependabot), but `lazy import` depends on it.
 6. Which language for commit messages: English (fits the code) or Dutch?
+7. F10: import folder (simple, original briefly in the cloud) or pairing over the local network (more private, server briefly listens more widely)?
