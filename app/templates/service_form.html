@@ -49,7 +49,7 @@
     <span class="field-header">Bestaande facturen</span>
     {% for f in invoices %}
     <div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)">
-      <a href="/invoices/{{ f.id }}" target="_blank">{{ icon("receipt") }} {{ f.original_filename }}</a>
+      <a href="/invoices/{{ f.id }}" target="_blank">{{ icon("receipt") }} {{ f.original_filename | filename }}</a>
       <a href="/invoices/{{ f.id }}/redact" class="chip {{ 'ok' if f.reviewed else 'warn' }}">{{ icon("eye-off") }} {{ "Opnieuw lakken" if f.reviewed else "Persoonsgegevens weglakken" }}</a>
       {% if f.original_path %}<a href="/invoices/{{ f.id }}/original" target="_blank" class="muted" style="font-size:.85rem">origineel</a>{% endif %}
       <button type="submit" form="del-{{ f.id }}" class="link-button" style="margin-left:auto">{{ icon("trash-2") }}</button>

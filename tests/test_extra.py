@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 from pypdf import PdfReader
 
 from app import backup, db, extra, invoice_reader, ocr, planning, redaction
-from tests.test_app import add_vehicle, client, new_service, pdf_bytes, review_all, type_id  # noqa: F401
+from tests.test_app import add_vehicle, backup_db, client, new_service, pdf_bytes, review_all, type_id  # noqa: F401
 
 OCR = pytest.mark.skipif(not ocr.available(), reason="Windows OCR not available")
 
@@ -88,8 +88,7 @@ def test_restore_brings_back_data_and_keeps_current_state(client, tmp_path):
     assert (db.DATA_DIR / f["path"]).is_file()  # invoices back too
     # the state from before the restore is ready as a safety backup
     safety = r.headers["location"].split("restored=")[1]
-    with zipfile.ZipFile(tmp_path / "backups" / safety) as z, z.open("onderhoud.db") as db_file:
-        assert b"ZZ99ZZ" in db_file.read()
+    assert b"ZZ99ZZ" in backup_db(tmp_path / "backups" / safety)
 
 
 @pytest.mark.parametrize("content", [

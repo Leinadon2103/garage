@@ -13,6 +13,18 @@ from tests.test_app import add_vehicle, client, new_service, pdf_bytes  # noqa: 
 APP = Path(__file__).resolve().parent.parent / "app"
 
 
+def test_tests_never_use_the_real_data_folder():
+    """conftest.py: without a test's own folder, db.DATA_DIR is a throwaway folder, never GARAGE_DATA of this pc."""
+    assert db.DATA_DIR.name.startswith("garage-tests-")
+
+
+def test_backups_of_test_data_go_to_their_own_folder(monkeypatch, tmp_path):
+    """start.bat sets GARAGE_BACKUPS: otherwise the test data is backed up between the real backups in OneDrive,
+    and with at most 10 kept, it would push out a real one."""
+    monkeypatch.setenv("GARAGE_BACKUPS", str(tmp_path))
+    assert backup.default_folder() == tmp_path
+
+
 def test_only_db_and_backup_touch_the_data_folder():
     """Everything else goes through db.read_file/write_file/delete_file, so encryption (P1) cannot be bypassed.
     backup.py zips and restores the folder as a whole; the files go in as they are."""

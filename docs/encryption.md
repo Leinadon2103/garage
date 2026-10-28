@@ -2,7 +2,7 @@
 
 *Nederlands: [encryption.nl.md](encryption.nl.md)*
 
-Status: proposal (K6), not built yet. Daniel's decision (October 2026): DPAPI for the data on this pc, a password on the backup. This document records how, and why.
+Status: built (build steps 1 to 4, see "Build order"). Daniel's decision (October 2026): DPAPI for the data on this pc, a password on the backup. This document records how, and why.
 
 ## Why
 - Invoices and documents are stored readable in the data folder, which is often in OneDrive (Documents). Backups also go to OneDrive readable by default, including the redaction terms ([data register](data-register.md), finding 5).

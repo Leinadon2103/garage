@@ -14,7 +14,7 @@ def described(path: Path) -> dict[str, set[str]]:
     tables = {}
     for block in re.split(r"^### ", path.read_text(encoding="utf-8"), flags=re.M)[1:]:
         name, _, rest = block.partition("\n")
-        tables[name.strip()] = set(re.findall(r"^\| `(\w+)` \| (?:INTEGER|TEXT|REAL)", rest, flags=re.M))
+        tables[name.strip()] = set(re.findall(r"^\| `(\w+)` \| (?:INTEGER|TEXT|REAL|BLOB)", rest, flags=re.M))
     return tables
 
 

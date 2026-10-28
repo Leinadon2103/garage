@@ -156,7 +156,7 @@
       {% if s.note %}<p><em>{{ s.note }}</em></p>{% endif %}
       <div class="bottom">
         {% for f in s.invoices %}
-          <a href="/invoices/{{ f.id }}" target="_blank">{{ icon("receipt") }} {{ f.original_filename }}</a>
+          <a href="/invoices/{{ f.id }}" target="_blank">{{ icon("receipt") }} {{ f.original_filename | filename }}</a>
           {% if f.reviewed %}<span class="chip ok" title="Gecontroleerd op persoonsgegevens">{{ icon("shield-check") }} privé-veilig</span>
           {% else %}<a href="/invoices/{{ f.id }}/redact" class="chip warn">{{ icon("eye-off") }} controleren</a>{% endif %}
         {% endfor %}

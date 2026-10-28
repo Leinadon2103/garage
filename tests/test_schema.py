@@ -6,7 +6,7 @@ import zipfile
 import pytest
 
 from app import backup, db
-from tests.test_app import add_vehicle, client  # noqa: F401
+from tests.test_app import add_vehicle, backup_db, client  # noqa: F401
 
 # Old database from before migrations: no user_version, no columns and tables that were added later.
 # Names are Dutch, as they were then.
@@ -116,13 +116,12 @@ def test_data_of_a_newer_version_is_not_touched(empty):
 
 def test_backup_of_a_newer_version_refused(client, tmp_path):
     add_vehicle(client)
-    zip_path = backup.create()
-    with zipfile.ZipFile(zip_path) as z:
-        z.extract("onderhoud.db", tmp_path / "out")
+    (tmp_path / "out").mkdir()
+    (tmp_path / "out" / "onderhoud.db").write_bytes(backup_db(backup.create()))
     newer = sqlite3.connect(tmp_path / "out" / "onderhoud.db")
     newer.execute(f"PRAGMA user_version = {db.SCHEMA_VERSION + 1}")
     newer.close()
-    with zipfile.ZipFile(tmp_path / "newer.zip", "w") as z:
+    with zipfile.ZipFile(tmp_path / "newer.zip", "w") as z:  # a readable database, like format 1
         z.write(tmp_path / "out" / "onderhoud.db", "onderhoud.db")
     with pytest.raises(backup.BackupError, match="nieuwere versie"):
         backup.restore(tmp_path / "newer.zip")

@@ -4,7 +4,7 @@
 
 Betekenis van elke tabel en kolom in `onderhoud.db`, met toegestane waarden en herkomst. Waar een gegeven staat en hoe gevoelig het is, staat in het [gegevensregister](data-register.nl.md). Nederlandse termen en hun Engelse namen: [woordenlijst](glossary.md).
 
-Stand: schemaversie 2 (`PRAGMA user_version`). De test `tests/test_data_dictionary.py` faalt als een kolom in de database hier ontbreekt (in beide talen); voeg bij een nieuwe migratie dus ook de kolommen hier toe.
+Stand: schemaversie 3 (`PRAGMA user_version`). De test `tests/test_data_dictionary.py` faalt als een kolom in de database hier ontbreekt (in beide talen); voeg bij een nieuwe migratie dus ook de kolommen hier toe.
 
 ## Afspraken
 - **Namen** in de database zijn Engels (sinds migratie 2). **Waarden** die de gebruiker ziet blijven Nederlands: voertuigsoorten (van de RDW), documentsoorten, namen van onderhoudstypes en specificaties.
@@ -15,6 +15,7 @@ Stand: schemaversie 2 (`PRAGMA user_version`). De test `tests/test_data_dictiona
 - **Bestandspaden** zijn relatief aan de gegevensmap, met `/`, en moeten voldoen aan `db.VALID_PATH` (`facturen/`, `beelden/` of `documenten/` + naam; de mapnamen blijven Nederlands omdat de gebruiker ze ziet). Paden daarbuiten worden geweigerd, ook uit een back-up.
 - **Mime-types**: alleen `application/pdf`, `image/jpeg` en `image/png`. Bij het tonen telt de extensie, nooit de databasewaarde.
 - **Verwijderen**: alle kindtabellen hebben `ON DELETE CASCADE` naar hun voertuig of beurt; de bijbehorende bestanden ruimt de app zelf op. `PRAGMA secure_delete` overschrijft verwijderde gegevens.
+- **Versleuteld** (P1, [ontwerp](encryption.nl.md)): alle bestanden in de gegevensmap, elk met een eigen sleutel in `file_key`. Versleutelde tekstvelden beginnen met `grge:` (`db.encrypt_text`): `invoice.original_filename`, `document.original_filename` en de instelling `private_terms`. Een veld zonder dat voorvoegsel is nog niet versleuteld en wordt bij de volgende start versleuteld.
 
 ## Tabellen
 
@@ -97,7 +98,7 @@ Factuur bij een beurt. Na het lakken zijn er twee bestanden: het origineel en de
 | `id` | INTEGER | Sleutel | | automatisch |
 | `service_id` | INTEGER, verplicht | Beurt | bestaande `service.id` | app |
 | `path` | TEXT, verplicht | Het bestand dat de app toont en exporteert: de gelakte versie als die er is, anders het origineel | `facturen/<voertuig-id>/<uuid>.<ext>` of `.../<uuid>-gelakt.<ext>` | app |
-| `original_filename` | TEXT, verplicht | Bestandsnaam bij het uploaden | vrij | upload |
+| `original_filename` | TEXT, verplicht | Bestandsnaam bij het uploaden | vrij, versleuteld (`grge:`) | upload |
 | `mime_type` | TEXT, verplicht | Bestandstype | zie Afspraken | uit de extensie, gecontroleerd op de eerste bytes |
 | `original_path` | TEXT | Het niet-gelakte origineel | pad zoals hierboven, of NULL = nog niet gelakt (dan is `path` het origineel) | app |
 | `reviewed` | INTEGER, verplicht | Gecontroleerd op persoonsgegevens; alleen dan gaat de factuur mee in de verkoop-PDF | `0` of `1` (standaard `0`) | lakscherm |
@@ -113,7 +114,7 @@ Losse documenten bij een voertuig. Gaan nooit mee in de verkoop-PDF.
 | `kind` | TEXT, verplicht | Soort document | `extra.DOCUMENT_KINDS` (kentekenbewijs, polis, aankoopfactuur, garantiebewijs, instructieboekje, keuringsrapport, overig) | keuzelijst |
 | `title` | TEXT | Eigen omschrijving | vrij of NULL | handmatig |
 | `path` | TEXT, verplicht | Bestand | `documenten/<voertuig-id>/<uuid>.<ext>` | app |
-| `original_filename` | TEXT, verplicht | Bestandsnaam bij het uploaden | vrij | upload |
+| `original_filename` | TEXT, verplicht | Bestandsnaam bij het uploaden | vrij, versleuteld (`grge:`) | upload |
 | `mime_type` | TEXT, verplicht | Bestandstype | zie Afspraken | uit de extensie |
 | `expiry_date` | TEXT | Verloopt op (bijv. polis); geeft een herinnering | ISO-datum of NULL | handmatig |
 | `added_on` | TEXT, verplicht | Datum van toevoegen | ISO-datum | app |
@@ -153,6 +154,16 @@ Specificaties per voertuig (olie, banden, accu, ...). De standaardlijst per soor
 
 Sleutel: (`vehicle_id`, `key`).
 
+### file_key
+De sleutel van elk versleuteld bestand (P1). Wordt de rij gewist, dan is elke kopie van het bestand onleesbaar, ook een oude versie in OneDrive.
+
+| Kolom | Type | Betekenis | Toegestane waarden | Herkomst |
+|---|---|---|---|---|
+| `path` | TEXT, sleutel | Bestandspad, zie Afspraken | geldig bestandspad | app |
+| `key` | BLOB, verplicht | Sleutel van het bestand (AES-256), versleuteld met de hoofdsleutel | `crypto`-formaat (`GRGE` + versie + nonce + inhoud) | app |
+
+Geen vreemde sleutel: ook een bestand zonder databaserij (wees) heeft een sleutel.
+
 ### setting
 Instellingen: sleutel-waardeparen voor de hele app.
 
@@ -164,7 +175,10 @@ Instellingen: sleutel-waardeparen voor de hele app.
 | Sleutel | Betekenis | Waarden | Standaard |
 |---|---|---|---|
 | `theme` | Weergave | `light`, `dark`, `system` | `system` |
-| `private_terms` | Eigen lak-termen (naam, adres), één per regel; termen korter dan 3 tekens tellen niet | vrije tekst | leeg |
+| `private_terms` | Eigen lak-termen (naam, adres), één per regel; termen korter dan 3 tekens tellen niet | vrije tekst, versleuteld (`grge:`) | leeg |
+| `master_key_backup` | De hoofdsleutel, versleuteld met het back-upwachtwoord (P2); gaat mee in elke back-up en haalt de sleutel terug als `garage.key` niet meer te openen is | JSON van `crypto.wrap_with_password` (zout, scrypt-instellingen, sleutel, vingerafdruk) | leeg tot er een wachtwoord is ingesteld |
+| `encrypted_notice` | Eenmalige melding na het versleutelen van bestaande bestanden (oude versies in OneDrive) | `on` of leeg | leeg |
+| `master_key_fingerprint` | Vingerafdruk van de hoofdsleutel (`crypto.fingerprint`), niet de sleutel zelf. Ontbreekt `garage.key` terwijl dit gevuld is, dan maakt Garage geen nieuwe sleutel | 16 hextekens | leeg tot de eerste start met versleuteling |
 | `reminders` | Windows-meldingen bij aanmelden | `on`, `off` | `on` |
 | `last_notification` | Laatst getoonde melding, om herhaling te beperken | JSON `{"date", "time", "key"}` | leeg |
 | `sketchfab_autoload` | 3D-model direct laden in plaats van na een klik | `on`, `off` | `off` |
@@ -198,5 +212,6 @@ Bronnen: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) en *Bra
 |---|---|---|
 | 1 | `db._migration_1` | Basis: het schema van Garage 1.3.0 (Nederlandse namen). Werkt ook op oudere databases zonder versienummer (vult ontbrekende tabellen en kolommen aan). |
 | 2 | `db._migration_2` | Engelse namen voor tabellen, kolommen, instellingssleutels en interne waarden (`RENAMES_2` en verwant). Waarden die de gebruiker ziet blijven Nederlands. |
+| 3 | `db._migration_3` | Tabel `file_key` voor de versleuteling (P1). De bestaande bestanden en velden versleutelt `db.encrypt_existing()` bij de start, niet de migratie. |
 
 Een nieuwe migratie komt achteraan in `db.MIGRATIONS` en krijgt hier een regel. Gegevens van een nieuwere versie dan de app kent, worden niet geopend en niet teruggezet.

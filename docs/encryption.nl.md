@@ -2,7 +2,7 @@
 
 *English: [encryption.md](encryption.md)*
 
-Status: voorstel (K6), nog niet gebouwd. Beslissing van Daniel (oktober 2026): DPAPI voor de gegevens op deze pc, een wachtwoord op de back-up. Dit document legt vast hoe, en waarom zo.
+Status: gebouwd (bouwstap 1 t/m 4, zie "Volgorde van bouwen"). Beslissing van Daniel (oktober 2026): DPAPI voor de gegevens op deze pc, een wachtwoord op de back-up. Dit document legt vast hoe, en waarom zo.
 
 ## Waarom
 - Facturen en documenten staan nu leesbaar in de gegevensmap, en die staat vaak in OneDrive (Documenten). Back-ups gaan standaard ook leesbaar naar OneDrive, met de lak-termen erbij ([gegevensregister](data-register.nl.md), bevinding 5).

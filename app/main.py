@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import threading
 import uuid
@@ -12,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 
-from . import backup, db, extra, image, planning
+from . import backup, crypto, db, extra, image, planning
 
 # load only when a screen needs them: PyMuPDF, reportlab, pypdf and httpx make the startup slow otherwise
 lazy from . import export_pdf, invoice_reader, rdw, redaction
@@ -26,14 +27,34 @@ HERE = Path(__file__).resolve().parent
 async def lifespan(_app):
     backup.clean_up()  # before init: an interrupted restore also puts back the database
     db.init()
-    # automatic backup in the background: the startup does not wait for it
-    threading.Thread(target=backup.automatic, daemon=True).start()
+    if db.needs_encryption():  # the first start with encryption (P1): first a backup of the state as it was
+        try:
+            backup.create()
+        except backup.BackupError:
+            logging.exception("Backup before encrypting failed; encrypting anyway (file by file, nothing is lost)")
+        if db.encrypt_existing():
+            with db.connect() as conn:  # once: about the readable old versions that OneDrive keeps
+                db.set_setting(conn, "encrypted_notice", "on")
+    # automatic backup in the background: the startup does not wait for it (tests do, via app.state)
+    _app.state.backup_thread = threading.Thread(target=backup.automatic, daemon=True)
+    _app.state.backup_thread.start()
     yield
 
 
 app = FastAPI(title="Garage", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 app.include_router(extra.router)
+
+KEYLESS = ("/recover", "/health", "/favicon.ico", "/static/")  # what works without the master key
+
+
+@app.middleware("http")  # registered before own_app_only, so it runs after those checks
+async def key_present(request: Request, call_next):
+    """Without the master key (other pc, Windows reinstalled) nothing can be read or written: every page goes to
+    the screen that brings it back with the backup password."""
+    if not request.url.path.startswith(KEYLESS) and not db.key_available():
+        return redirect("/recover")
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -91,6 +112,25 @@ def health():
     return {"app": "garage"}
 
 
+@app.get("/recover")
+def recover(request: Request):
+    if db.key_available():
+        return redirect("/")
+    with db.connect() as conn:
+        has_password = bool(db.setting(conn, "master_key_backup"))
+    return render(request, "recover.html", has_password=has_password)
+
+
+@app.post("/recover")
+def recover_with_password(request: Request, password: str = Form("")):
+    try:
+        db.unlock_with_password(password)
+    except crypto.CryptoError as e:
+        return render(request, "recover.html", status_code=400, has_password=True, error=str(e))
+    db.encrypt_existing()  # what was left readable while the key was missing
+    return redirect("/")
+
+
 @app.exception_handler(StarletteHTTPException)
 async def http_error(request: Request, exc: StarletteHTTPException):
     """Error page in the app layout, except for files and fetch requests."""
@@ -123,8 +163,16 @@ def index(request: Request):
             v["in_storage"] = db.active_storage(conn, v["id"]) is not None
             attention[v["id"]] = sum(p["color"] != "green" for p in extra.vehicle_plan(conn, v, current_km=v["km"]))
         backup_status = backup.status(conn)
+        encrypted_notice = db.setting(conn, "encrypted_notice") == "on"
     return render(request, "index.html", vehicles=vehicles, attention=attention, backup=backup_status,
-                  restored=request.query_params.get("restored"))
+                  restored=request.query_params.get("restored"), encrypted_notice=encrypted_notice)
+
+
+@app.post("/notice/encrypted")
+def dismiss_encrypted_notice():
+    with db.connect() as conn:
+        db.set_setting(conn, "encrypted_notice", "")
+    return redirect("/")
 
 
 @app.get("/vehicles/new")
@@ -439,11 +487,11 @@ async def save_service(request: Request, vid: int, sid: int | None, form_data: d
         try:
             for name, ext, content in uploads:
                 written.append(f"facturen/{vid}/{uuid.uuid4().hex}{ext}")
-                db.write_file(written[-1], content)
+                db.write_file(written[-1], content, conn)
                 conn.execute("INSERT INTO invoice (service_id, path, original_filename, mime_type) VALUES (?,?,?,?)",
-                             (sid, written[-1], name, ALLOWED[ext][0]))
+                             (sid, written[-1], db.encrypt_text(name, "original_filename"), ALLOWED[ext][0]))
         except Exception:
-            delete_files(written)  # the database is rolled back, so the files go too
+            delete_files(written, conn)  # the database is rolled back, so the files go too
             raise
     # new invoices: straight on to the redaction screen for personal data
     return redirect(f"/services/{sid}/redact" if uploads else f"/vehicles/{vid}")
@@ -609,7 +657,7 @@ def save_redaction(iid: int, redactions: str = Form("[]")):
 def settings(request: Request, saved: int = 0):
     with db.connect() as conn:
         types = conn.execute("SELECT * FROM maintenance_type ORDER BY name = ?, name", (db.OTHER_TYPE,)).fetchall()
-        terms = db.setting(conn, "private_terms")
+        terms = db.private_terms_text(conn)
         other = {**extra.backup_context(conn), "reminders": db.setting(conn, "reminders", "on") == "on",
                  "sketchfab_autoload": db.setting(conn, "sketchfab_autoload", "off") == "on"}
     groups = [("*", "Alle voertuigen"), (db.MOTORCYCLE, "Motoren en brommers"), (db.CAR, "Auto's en bedrijfsauto's"),
@@ -626,7 +674,7 @@ def maintenance_types():
 @app.post("/settings/private")
 def save_private_terms(terms: str = Form("")):
     with db.connect() as conn:
-        db.set_setting(conn, "private_terms", "\n".join(t.strip() for t in terms.splitlines() if t.strip()))
+        db.set_private_terms(conn, "\n".join(t.strip() for t in terms.splitlines() if t.strip()))
     return redirect("/settings?saved=1#private")
 
 

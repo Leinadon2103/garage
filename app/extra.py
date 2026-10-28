@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from . import backup, db, planning
+from . import backup, crypto, db, planning
 from .web import ALLOWED, delete_files, fetch, file_response, or_400, parse_int, read_uploads, redirect, render
 
 router = APIRouter()
@@ -179,14 +179,14 @@ async def add_document(vid: int, kind: str = Form(...), title: str = Form(""), e
     with db.connect() as conn:
         fetch(conn, "vehicle", vid)
         path = f"documenten/{vid}/{uuid.uuid4().hex}{ext}"
-        db.write_file(path, content)
+        db.write_file(path, content, conn)
         try:
             conn.execute("INSERT INTO document (vehicle_id, kind, title, path, original_filename, mime_type, expiry_date,"
                          " added_on) VALUES (?,?,?,?,?,?,?,?)",
-                         (vid, kind, title.strip() or None, path, name, ALLOWED[ext][0], expiry_date,
-                          date.today().isoformat()))
+                         (vid, kind, title.strip() or None, path, db.encrypt_text(name, "original_filename"),
+                          ALLOWED[ext][0], expiry_date, date.today().isoformat()))
         except Exception:
-            delete_files([path])
+            delete_files([path], conn)
             raise
     return redirect(f"/vehicles/{vid}/documents")
 
@@ -378,32 +378,52 @@ def backup_settings(folder: str = Form(""), auto: str = Form("")):
     return redirect("/settings?backup=saved#backup")
 
 
-def _restore(zip_path: Path):
+@router.post("/backup/password")
+def backup_password(password: str = Form(""), repeat: str = Form(""), understood: str = Form("")):
+    if password != repeat:
+        raise HTTPException(400, "De twee wachtwoorden zijn niet gelijk.")
+    if not understood:
+        raise HTTPException(400, "Vink aan dat je begrijpt dat een vergeten wachtwoord niet te herstellen is.")
     try:
-        safety = backup.restore(zip_path)
-    except backup.BackupError as e:
+        db.set_backup_password(password)
+    except crypto.CryptoError as e:
         raise HTTPException(400, str(e))
+    return redirect("/settings?backup=password#backup")
+
+
+def _restore(zip_path: Path, password: str):
+    safety = backup.restore(zip_path, password or None)  # BackupError: handled by the caller
     return redirect(f"/?restored={safety.name}")
 
 
 @router.post("/backup/restore")
-def restore_backup(name: str = Form(...)):
+def restore_backup(request: Request, name: str = Form(...), password: str = Form("")):
     with db.connect() as conn:
         folder = backup.target_folder(conn)
     # only a backup from the list (no arbitrary path from outside)
     candidate = next((b["path"] for b in backup.all_backups(folder) if b["name"] == name), None)
     if not candidate:
         raise HTTPException(404, "Back-up niet gevonden")
-    return _restore(candidate)
+    try:
+        return _restore(candidate, password)
+    except backup.PasswordNeeded as e:  # from another pc: ask for its password, then try again
+        return render(request, "restore_password.html", status_code=400, backup_name=name, error=str(e))
+    except backup.BackupError as e:
+        raise HTTPException(400, str(e))
 
 
 @router.post("/backup/restore-file")
-async def restore_backup_file(file: UploadFile = File(...)):
+async def restore_backup_file(file: UploadFile = File(...), password: str = Form("")):
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "upload.zip"
         with open(path, "wb") as out:
             shutil.copyfileobj(file.file, out)
-        return _restore(path)
+        try:
+            return _restore(path, password)
+        except backup.PasswordNeeded as e:
+            raise HTTPException(400, f"{e} Kies het bestand opnieuw en vul het wachtwoord in onder 'Dit bestand terugzetten'.")
+        except backup.BackupError as e:
+            raise HTTPException(400, str(e))
 
 
 # ---------- reminders ----------

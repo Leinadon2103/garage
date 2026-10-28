@@ -10,10 +10,13 @@ import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path, PurePosixPath
 
-from . import db
+from . import crypto, db
 
 # Names of folders and files the user sees (data folder, backup folder) stay Dutch.
-FOLDERS = ("facturen", "beelden", "documenten")
+FOLDERS = db.DATA_FOLDERS
+INFO = "garage-backup.json"
+FORMAT = 2  # 1 (or missing): everything readable, before P1/P2. 2: database encrypted, master key with password
+BACKUP_DB_CONTEXT = "backup-db"
 PREFIX = "Garage-backup-"
 SAFETY_PREFIX = "Garage-veiligheidskopie-"  # made automatically just before a restore
 DEFAULT_FOLDER_NAME = "Garage back-ups"
@@ -31,8 +34,15 @@ class BackupError(Exception):
     pass
 
 
+class PasswordNeeded(BackupError):
+    """The backup comes from another pc or installation: only its backup password opens it."""
+
+
 def default_folder() -> Path:
-    """OneDrive if there is one (then the backup is in the cloud as well), otherwise the user folder."""
+    """OneDrive if there is one (then the backup is in the cloud as well), otherwise the user folder.
+    GARAGE_BACKUPS overrides it (start.bat: backups of the test data never go between the real ones)."""
+    if os.environ.get("GARAGE_BACKUPS"):
+        return Path(os.environ["GARAGE_BACKUPS"])
     onedrive = os.environ.get("OneDrive")
     base = Path(onedrive) if onedrive and Path(onedrive).is_dir() else Path.home()
     return base / DEFAULT_FOLDER_NAME
@@ -73,10 +83,19 @@ def all_backups(folder: Path) -> list[dict]:
 
 
 def create(folder: Path | None = None, prefix: str = PREFIX, keep_also: Path | None = None) -> Path:
-    """Makes a backup; writes to a temporary file first, so there is never half a zip left behind."""
+    """Makes a backup; writes to a temporary file first, so there is never half a zip left behind.
+
+    Format 2 (P2): the files go in as they are (already encrypted), the database encrypted with the master key,
+    and garage-backup.json holds the master key wrapped with the backup password (if one is set): then the
+    backup can be restored on another pc with that password, and without it on this pc only."""
     with _LOCK:
         with db.connect() as conn:
             folder = check_target_folder(folder or target_folder(conn))
+            try:
+                master = db.master_key(conn)
+            except crypto.CryptoError as e:
+                raise BackupError(f"Back-up mislukt: {e}")
+            wrapped = db.setting(conn, "master_key_backup") or None
         base = f"{prefix}{datetime.now():%Y-%m-%d_%H%M%S}"
         name, sequence = f"{base}.zip", 1
         while (folder / name).exists():  # never overwrite an existing backup (e.g. two in the same second)
@@ -89,15 +108,16 @@ def create(folder: Path | None = None, prefix: str = PREFIX, keep_also: Path | N
                 copy = Path(tmp) / db.DB_NAME
                 _copy_db(db.DATA_DIR / db.DB_NAME, copy)  # consistent copy, even while the app is writing
                 with zipfile.ZipFile(part, "w", zipfile.ZIP_DEFLATED) as z:
-                    z.write(copy, db.DB_NAME)
+                    z.writestr(db.DB_NAME, crypto.encrypt(master, copy.read_bytes(), BACKUP_DB_CONTEXT))
                     for sub in FOLDERS:
                         for file in sorted((db.DATA_DIR / sub).rglob("*")) if (db.DATA_DIR / sub).is_dir() else []:
                             if file.is_file() and file.suffix != ".deel":  # a file being written right now
                                 z.write(file, file.relative_to(db.DATA_DIR).as_posix())
                                 count += 1
-                    z.writestr("garage-backup.json", json.dumps({"created": datetime.now().isoformat(timespec="seconds"),
-                                                                 "files": count}))
-                _verify(part, count, Path(tmp))
+                    z.writestr(INFO, json.dumps({"created": datetime.now().isoformat(timespec="seconds"), "files": count,
+                                                 "format": FORMAT, "fingerprint": crypto.fingerprint(master),
+                                                 "master_key": wrapped}))
+                _verify(part, count, Path(tmp), master)
             os.replace(part, folder / name)
         except Exception as e:
             part.unlink(missing_ok=True)
@@ -118,23 +138,22 @@ def create(folder: Path | None = None, prefix: str = PREFIX, keep_also: Path | N
         return folder / name
 
 
-def _verify(zip_path: Path, files: int, tmp: Path) -> None:
+def _verify(zip_path: Path, files: int, tmp: Path, master: bytes) -> None:
     """Reads a fresh backup back before it gets its final name: every file intact (CRC), nothing missing and a
-    sound database. The backup is often the only other copy of the original invoices."""
+    sound database that decrypts. The backup is often the only other copy of the original invoices."""
     check = tmp / "check.db"
     try:
         with zipfile.ZipFile(zip_path) as z:
             ok = z.testzip() is None and len(z.namelist()) == files + 2  # + database and garage-backup.json
             if ok:
-                with z.open(db.DB_NAME) as src, open(check, "wb") as dst:
-                    shutil.copyfileobj(src, dst)
+                check.write_bytes(crypto.decrypt(master, z.read(db.DB_NAME), BACKUP_DB_CONTEXT))
         if ok:
             test = sqlite3.connect(check)
             try:
                 ok = test.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
             finally:
                 test.close()
-    except (zipfile.BadZipFile, KeyError, OSError, sqlite3.DatabaseError):
+    except (zipfile.BadZipFile, KeyError, OSError, sqlite3.DatabaseError, crypto.CryptoError):
         ok = False
     if not ok:
         raise BackupError("Back-up mislukt: bij de controle van de nieuwe back-up bleek die niet in orde. Probeer het opnieuw.")
@@ -143,7 +162,7 @@ def _verify(zip_path: Path, files: int, tmp: Path) -> None:
 def _safe_name(name: str) -> bool:
     path = PurePosixPath(name)
     return (not path.is_absolute() and ".." not in path.parts and ":" not in name and "\\" not in name
-            and (name in (db.DB_NAME, "garage-backup.json") or path.parts[0] in FOLDERS))
+            and (name in (db.DB_NAME, INFO) or path.parts[0] in FOLDERS))
 
 
 def _check_database(path: Path) -> None:
@@ -170,12 +189,33 @@ def _check_database(path: Path) -> None:
         raise BackupError("De database in deze back-up is beschadigd of bevat ongeldige gegevens.")
 
 
-def restore(zip_path: Path) -> Path:
+def _backup_key(info: dict, password: str | None) -> bytes:
+    """The master key of a format 2 backup: the one of this pc if the fingerprint matches (no password needed),
+    otherwise the one in the backup, opened with its password."""
+    try:
+        current = db.master_key()
+    except crypto.CryptoError:
+        current = None
+    if current and info.get("fingerprint") == crypto.fingerprint(current):
+        return current
+    if not isinstance(info.get("master_key"), str):
+        raise BackupError("Deze back-up is gemaakt zonder back-upwachtwoord. Hij kan alleen worden teruggezet op de "
+                          "pc en het Windows-account waar hij is gemaakt.")
+    if not password:
+        raise PasswordNeeded("Deze back-up komt van een andere pc of installatie. Vul het back-upwachtwoord in "
+                             "waarmee hij is gemaakt.")
+    try:
+        return crypto.unwrap_with_password(info["master_key"], password)
+    except crypto.CryptoError as e:
+        raise PasswordNeeded(str(e))
+
+
+def restore(zip_path: Path, password: str | None = None) -> Path:
     """Restores a backup; returns the safety copy of the current state.
 
-    Order: unpack and check -> safety copy -> move the current folders aside (fails fast if a file is open)
-    -> place the new folders + database. If anything goes wrong on the way, everything is rolled back
-    to the old state."""
+    Order: unpack, decrypt and check -> safety copy -> move the current folders aside (fails fast if a file is
+    open) -> place the new folders + database -> the key of the backup (if it is another one) becomes the key
+    of this pc. If anything goes wrong on the way, everything is rolled back to the old state."""
     with _LOCK:
         try:
             z = zipfile.ZipFile(zip_path)
@@ -188,14 +228,36 @@ def restore(zip_path: Path) -> Path:
                 raise BackupError("Dit is geen geldige Garage-back-up.")
             if sum(i.file_size for i in z.infolist()) > MAX_SIZE:
                 raise BackupError("Deze back-up is onverwacht groot en wordt niet uitgepakt.")
+            try:
+                info = json.loads(z.read(INFO)) if INFO in names else {}
+            except ValueError:
+                info = {}
+            info = info if isinstance(info, dict) else {}
+            key = _backup_key(info, password) if info.get("format", 1) >= 2 else None
+            with db.connect() as conn:  # belongs to the key of this pc: stays if that key stays
+                own_wrapped = db.setting(conn, "master_key_backup")
             shutil.rmtree(tmp, ignore_errors=True)
             try:
                 z.extractall(tmp)
+                if key:
+                    try:
+                        plain = crypto.decrypt(key, (tmp / db.DB_NAME).read_bytes(), BACKUP_DB_CONTEXT)
+                    except crypto.CryptoError:
+                        raise BackupError("De database in deze back-up is beschadigd of bevat ongeldige gegevens.")
+                    (tmp / db.DB_NAME).write_bytes(plain)
                 _check_database(tmp / db.DB_NAME)
                 safety = create(prefix=SAFETY_PREFIX, keep_also=zip_path)
+                adopt = key is not None and key != db.master_key()
                 _swap(tmp)
             finally:
                 shutil.rmtree(tmp, ignore_errors=True)
+        if adopt:  # from another pc: from now on its key is the key here (the database already expects it)
+            crypto.save_master(db.DATA_DIR, key)
+            db.reset_master_key()
+        elif own_wrapped:  # same key: the password set here stays, also over an older backup
+            with db.connect() as conn:
+                db.set_setting(conn, "master_key_backup", own_wrapped)
+        db.encrypt_existing()  # a backup from before P1 has readable files; if interrupted, the next start goes on
         with db.connect() as conn:
             db.set_setting(conn, "backup_last", datetime.now().isoformat(timespec="seconds"))
         return safety
@@ -299,6 +361,7 @@ def status(conn) -> dict:
         "last": last_dt,
         "error": db.setting(conn, "backup_error"),
         "too_old": last_dt is None or datetime.now() - last_dt > timedelta(days=WARN_DAYS),
+        "password": bool(db.setting(conn, "master_key_backup")),  # without: a backup only works on this pc
         "same_drive": not os.environ.get("OneDrive") and
                       Path(target_folder(conn)).anchor.lower() == db.DATA_DIR.resolve().anchor.lower(),
     }
