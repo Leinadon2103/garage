@@ -314,7 +314,7 @@ def _self_test_steps(base: str, oil: int, lines: list[str]) -> None:
             step(f"GET {path}", c.get(path))
         v = step("add vehicle", c.post("/vehicles", data={
             "license_plate": "ZT-01-ST", "vehicle_type": "Motorfiets", "make": "Test"}), 303).headers["location"]
-        for sub in ("", "/costs", "/documents", "/specs", "/storage", "/intervals"):
+        for sub in ("", "/costs", "/documents", "/specs", "/storage", "/intervals", "/fuel"):
             step(f"GET {v}{sub}", c.get(v + sub))
         step("read invoice (OCR)", c.post(f"{v}/read-invoice", files=invoices))
         redact = step("save service with invoices", c.post(f"{v}/services/new", files=invoices, data={

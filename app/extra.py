@@ -8,8 +8,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from . import backup, crypto, db, planning
-from .web import ALLOWED, delete_files, fetch, file_response, or_400, parse_int, read_uploads, redirect, render
+from . import backup, crypto, db, fuel, planning
+from .web import (ALLOWED, delete_files, fetch, file_response, or_400, parse_amount, parse_int, read_uploads, redirect,
+                  render)
 
 router = APIRouter()
 
@@ -63,8 +64,8 @@ def set_theme(theme: str = Form(...)):
 
 # ---------- odometer readings ----------
 
-SOURCE_TEXT = {"service": "bij een onderhoudsbeurt", "reading": "als losse km-stand", "storage_start": "bij het stallen",
-               "storage_end": "bij het ophalen uit de stalling"}
+SOURCE_TEXT = {"service": "bij een onderhoudsbeurt", "reading": "als losse km-stand", "fuel": "bij het tanken",
+               "storage_start": "bij het stallen", "storage_end": "bij het ophalen uit de stalling"}
 
 
 def km_check(conn, vid: int, day: str, km: int, except_service: int | None = None) -> str | None:
@@ -108,6 +109,54 @@ def delete_reading(rid: int):
     return redirect(f"/vehicles/{vid}/costs#odometer")
 
 
+# ---------- fill-ups and fuel consumption (F2) ----------
+
+def fuel_entries(conn, vid: int) -> list[dict]:
+    return [dict(e) for e in conn.execute(
+        "SELECT * FROM fuel_entry WHERE vehicle_id = ? ORDER BY date DESC, odometer_km DESC, id DESC", (vid,))]
+
+
+@router.get("/vehicles/{vid}/fuel")
+def fuel_page(request: Request, vid: int, saved: int = 0):
+    with db.connect() as conn:
+        v = fetch(conn, "vehicle", vid)
+        entries = fuel_entries(conn, vid)
+        current_km = db.current_km(conn, vid)
+    stats = fuel.consumption(entries)
+    return render(request, "fuel.html", v=v, entries=entries, stats=stats, saved=saved, current_km=current_km,
+                  km_per_liter=fuel.km_per_liter(stats["average"]), today=date.today().isoformat())
+
+
+@router.post("/vehicles/{vid}/fuel")
+def add_fuel(vid: int, date_: str = Form("", alias="date"), odometer_km: str = Form(""), liters: str = Form(""),
+             cost: str = Form(""), full_tank: str = Form(""), note: str = Form("")):
+    day = _not_in_future(_date(date_ or date.today().isoformat()))
+    km = or_400(parse_int, odometer_km)
+    if km is None:
+        raise HTTPException(400, "Vul de kilometerstand bij het tanken in.")
+    amount = or_400(parse_amount, liters)
+    if not amount or not 0 < amount <= 1000:
+        raise HTTPException(400, "Vul het aantal getankte liters in.")
+    price = or_400(parse_amount, cost)
+    if price is not None and price < 0:
+        raise HTTPException(400, "Het bedrag kan niet negatief zijn.")
+    with db.connect() as conn:
+        fetch(conn, "vehicle", vid)
+        if error := km_check(conn, vid, day, km):
+            raise HTTPException(400, error)
+        conn.execute("INSERT INTO fuel_entry (vehicle_id, date, odometer_km, liters, cost, full_tank, note)"
+                     " VALUES (?,?,?,?,?,?,?)", (vid, day, km, amount, price, 1 if full_tank else 0, note.strip() or None))
+    return redirect(f"/vehicles/{vid}/fuel?saved=1")
+
+
+@router.post("/fuel/{fid}/delete")
+def delete_fuel(fid: int):
+    with db.connect() as conn:
+        vid = fetch(conn, "fuel_entry", fid)["vehicle_id"]
+        conn.execute("DELETE FROM fuel_entry WHERE id = ?", (fid,))
+    return redirect(f"/vehicles/{vid}/fuel")
+
+
 # ---------- cost and km overview ----------
 
 def _cost_chart(per_year: dict[int, float]) -> dict:
@@ -135,6 +184,7 @@ def costs(request: Request, vid: int):
         services = db.services(conn, vid)
         history = db.odometer_history(conn, vid)
         readings = conn.execute("SELECT * FROM odometer_reading WHERE vehicle_id = ? ORDER BY date DESC", (vid,)).fetchall()
+        fuel_stats = fuel.consumption(fuel_entries(conn, vid))
     with_cost = [s for s in services if s["cost"]]
     per_year: dict[int, float] = {}
     per_kind: dict[str, float] = {}
@@ -146,8 +196,9 @@ def costs(request: Request, vid: int):
     total = sum(s["cost"] for s in with_cost)
     driven = (history[-1]["odometer_km"] - history[0]["odometer_km"]) if len(history) >= 2 else 0
     highest_kind = max(per_kind.values(), default=1)
-    return render(request, "costs.html", v=v, total=total, count=len(with_cost),
-                  per_km=total / driven if driven > 0 and total else None, driven=driven,
+    everything = total + fuel_stats["cost"]  # maintenance + fuel: what the vehicle really costs per km
+    return render(request, "costs.html", v=v, total=total, count=len(with_cost), fuel=fuel_stats,
+                  per_km=everything / driven if driven > 0 and everything else None, driven=driven,
                   per_year=_cost_chart(per_year),
                   per_kind=sorted(((k, a, a / highest_kind) for k, a in per_kind.items()), key=lambda x: -x[1]),
                   km=_km_chart(history), history=list(reversed(history)), readings=readings)

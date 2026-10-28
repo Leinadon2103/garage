@@ -19,7 +19,7 @@ Stand: oktober 2026, na versie 1.3.0. Dit document is de overdracht naar een nie
 - Weglakken is echt (`apply_redactions` + `scrub`). Een ongecontroleerde factuur komt nooit in de verkoop-PDF. Van foto's wordt EXIF verwijderd.
 - Een privacyoverzicht in de app en in `PRIVACY.md`. Sketchfab laadt pas na een klik.
 - Pakketten liggen vast met hashes, met pip-audit, bandit en Dependabot (ook voor de GitHub Actions). Licentie AGPL-3.0, met `LICENSES.md`.
-- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10, G9 en K3, en de omzetting naar Engelse code (migratie 2). CI draait op GitHub; de repo is openbaar en `main` is beschermd (zie Werkafspraken).
+- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10, G9 en K3, en de omzetting naar Engelse code (migratie 2). Daarna versleuteling van bestanden, gevoelige velden en back-ups met herstel via het back-upwachtwoord (P1, P2, P8; [encryption.nl.md](encryption.nl.md)) en tankbeurten met verbruik (F2). Schemaversie 4. CI draait op GitHub; de repo is openbaar en `main` is beschermd (zie Werkafspraken).
 
 ## Juridisch kader (inschatting, geen juridisch advies)
 - Voor eigen gebruik valt Garage onder de **huishoudelijke uitzondering** (art. 2 lid 2 sub c AVG).
@@ -63,7 +63,7 @@ Gedaan staat ~~doorgestreept~~.
 | **S1** | Strikte CSP: alle `onclick`/`onsubmit` naar `static/app.js`, dan `script-src 'self'` | Ingevoegde code kan dan niet meer draaien | middel |
 | ~~**S2**~~ | ~~GitHub Actions (Windows-runner): tests, pip-audit en bandit bij elke push en Dependabot-PR~~ | Dependabot-PR's werden nergens getest | gedaan |
 | ~~**S3**~~ | ~~Rooktest van de exe: `Garage.exe --self-test`, in `build.bat`~~ | De gebouwde exe werd nooit automatisch getest | gedaan |
-| **S4** | Een willekeurig sessietoken in een cookie, gezet via de start-URL | Andere Windows-gebruikers op dezelfde pc kunnen nu bij de server | klein |
+| **S4** | Een willekeurig sessietoken in een cookie, gezet via de start-URL | Andere Windows-gebruikers op dezelfde pc kunnen nu bij de server, en die geeft ontsleutelde bestanden: P1 beschermt de schijf, niet de draaiende app | klein |
 | **S5** | Ondertekenen van de exe (Azure Trusted Signing, ca. €10 per maand), SHA-256 bij releases, `SECURITY.md` | Echtheid voor gebruikers, geen SmartScreen-waarschuwing | middel, kost geld |
 | **S6** | PDF's openen in een apart proces met een tijdslimiet | Een kwaadaardige PDF kan de app dan niet laten hangen of crashen | middel |
 
@@ -71,7 +71,7 @@ Gedaan staat ~~doorgestreept~~.
 | Code | Wat | Waarde | Omvang |
 |---|---|---|---|
 | **F1** | Agenda-export (`.ics`) van gepland onderhoud, APK en verlopende documenten | Herinneringen in je eigen agenda, volledig offline | klein |
-| **F2** | Tankbeurten en verbruik (l/100 km, km/l), kosten per km inclusief brandstof | Een veelgevraagde functie in onderhoudsapps; een completer kostenbeeld | middel |
+| ~~**F2**~~ | ~~Tankbeurten en verbruik (l/100 km, km/l), kosten per km inclusief brandstof~~ | Een veelgevraagde functie in onderhoudsapps; een completer kostenbeeld | gedaan |
 | **F3** | APK-historie en gebreken uit RDW Open Data, en details van terugroepacties | Meer waarde in de verkoop-PDF, zonder extra persoonsgegevens | middel |
 | **F4** | Zoeken en filteren in de historie (type, garage, periode, bedrag) | Gemak bij lange historie | klein |
 | **F5** | Totale kosten van bezit (TCO): afschrijving, verzekering, belasting en onderhoud per jaar | Inzicht | middel |
@@ -79,11 +79,13 @@ Gedaan staat ~~doorgestreept~~.
 | **F7** | Onderdelen en verbruiksmaterialen (olie, filters) met artikelnummers; lijst "nodig voor de volgende beurt" | Praktisch voor wie zelf sleutelt | middel |
 | **F8** | Melden van een nieuwe versie via GitHub Releases, alleen na toestemming | Updates zonder telemetrie | klein |
 | **F9** | Toegankelijkheid (WCAG 2.2: toetsenbord, contrast, schermlezer) | Kwaliteit, en nodig als anderen de app gaan gebruiken | middel |
+| **F10** | Invoeren onderweg: tankbeurten, km-standen en foto's van facturen vanaf de telefoon. Optie a: een importmap (bijv. in OneDrive) die Garage oppikt, versleutelt en leegmaakt. Optie b: koppelen via het lokale netwerk met een QR-code en een eenmalig token, alleen zolang het scherm openstaat (vereist S4 en een dreigingsanalyse in K6) | Tanken en facturen gebeuren buiten de pc en worden anders vergeten; F2 maakt dit dringender. Bij optie a staat het origineel kort onversleuteld in de cloud | middel |
+| **F11** | Prullenbak: verwijderde beurten, facturen en documenten blijven 30 dagen versleuteld bewaard en worden daarna echt gewist (termijn via P7) | Met `secure_delete` en crypto-shredding is een verkeerde klik definitief; alleen een back-up van tot een week oud helpt | middel |
 
 ### Codekwaliteit en professionalisering
 | Code | Wat | Waarom | Omvang |
 |---|---|---|---|
-| **K1** | `main.py` opsplitsen in routers per onderwerp: voertuigen, beurten, facturen, beeld | Overzicht; het bestand is ca. 500 regels | middel |
+| **K1** | `main.py` opsplitsen in routers per onderwerp: voertuigen, beurten, facturen, beeld | Overzicht; het bestand is ca. 700 regels | middel |
 | **K2** | `ruff` (opmaak en lint) en een typecontrole (`pyright`) in `build.bat` en CI | Fouten eerder zien | klein |
 | ~~**K3**~~ | ~~Back-up controleren na het maken: zip openen en `PRAGMA integrity_check`~~ | De back-up is de enige kopie van de originelen; P2 bouwt erop voort | gedaan |
 | **K4** | Exe en installatieprogramma bouwen in CI, met SHA-256 en GitHub artifact attestation | Aantoonbaar gebouwd uit deze broncode; gratis deel van S5 | middel |
@@ -96,16 +98,17 @@ Gedaan staat ~~doorgestreept~~.
 
 ## Voorgestelde volgorde
 1. ~~**Fundament:** S2, S3, G1, G2, G3.~~ Gedaan, met P9, P10, G9 en de omzetting naar Engelse code.
-2. **Grootste privacywinst:** ~~K3~~, ~~P1 + P2~~ (gedaan), daarna P3, P4 en P6.
+2. **Grootste privacywinst:** ~~K3~~, ~~P1 + P2~~ (gedaan), dan S4 (naar voren gehaald: zonder S4 beschermt P1 niet tegen andere gebruikers op dezelfde pc), daarna P3, P4 en P6.
 3. **Vertrouwen voor de koper:** G4, G6, G7, en daarbij F3.
-4. **Afronden:** S1, P5, P7, ~~P8~~ (gedaan, met P1), G5, G8, S4, K1, K2.
-5. **Professionalisering, verspreid:** K4 t/m K9.
-6. **Features naar keuze:** F1, F2 en F4 zijn snel en waardevol; de rest op aanvraag.
+4. **Afronden:** S1, P5, P7 met F11, ~~P8~~ (gedaan, met P1), G5, G8, K1, K2.
+5. **Professionalisering, verspreid:** K4 t/m K9. Gaat de app naar anderen: K4, K5 en F8 samen als release-straat, vóór S5 en F9.
+6. **Features, gekozen door Daniel (oktober 2026):** ~~F2~~ (gedaan), dan F1, F4 en F3, elk als eigen PR. Daarna F10, dat de meeste waarde heeft voor dagelijks gebruik (eerst beslissing 7); de rest op aanvraag.
 
 ## Open beslissingen voor Daniel
 1. ~~Wordt de GitHub-repo openbaar?~~ Ja, de repo is openbaar. Nog open: gaat de app actief naar anderen? Dat bepaalt S5, F8 en F9.
 2. ~~P1: DPAPI of een eigen wachtwoord?~~ Besloten: DPAPI voor de gegevens op deze pc (P1), een wachtwoord op de back-up (P2), zodat terugzetten op een andere pc kan. Uitwerken in K6.
 3. P3: na verkoop alles wissen of een geanonimiseerd archief bewaren?
-4. Welke features (F1 t/m F9) hebben de voorkeur?
+4. ~~Welke features hebben de voorkeur?~~ Besloten: F2, F1, F4 en F3, in die volgorde (zie Voorgestelde volgorde, stap 6).
 5. Blijft Python 3.15 de basis? Het ecosysteem loopt nog achter (zie pyyaml, Dependabot), maar `lazy import` hangt ervan af.
 6. In welke taal schrijven we commitberichten: Engels (past bij de code) of Nederlands?
+7. F10: importmap (eenvoudig, origineel kort in de cloud) of koppelen via het lokale netwerk (privacyvriendelijker, server luistert tijdelijk breder)?

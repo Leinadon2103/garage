@@ -242,7 +242,16 @@ def _migration_3(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE TABLE file_key (path TEXT PRIMARY KEY, key BLOB NOT NULL)")
 
 
-MIGRATIONS = [_migration_1, _migration_2, _migration_3]
+def _migration_4(conn: sqlite3.Connection) -> None:
+    """Fill-ups (F2): fuel consumption, fuel costs, and one more source of odometer readings."""
+    conn.execute("""CREATE TABLE fuel_entry (
+        id INTEGER PRIMARY KEY,
+        vehicle_id INTEGER NOT NULL REFERENCES vehicle(id) ON DELETE CASCADE,
+        date TEXT NOT NULL, odometer_km INTEGER NOT NULL, liters REAL NOT NULL, cost REAL,
+        full_tank INTEGER NOT NULL DEFAULT 1, note TEXT)""")
+
+
+MIGRATIONS = [_migration_1, _migration_2, _migration_3, _migration_4]
 SCHEMA_VERSION = len(MIGRATIONS)
 
 
@@ -337,16 +346,17 @@ def intervals(conn: sqlite3.Connection, vehicle_id: int) -> dict[int, tuple[int 
 
 
 def odometer_history(conn: sqlite3.Connection, vehicle_id: int) -> list[dict]:
-    """All known odometer readings (services, separate readings, storage), oldest first."""
+    """All known odometer readings (services, separate readings, fill-ups, storage), oldest first."""
     rows = conn.execute("""
         SELECT date, odometer_km, 'service' AS source, id FROM service
             WHERE vehicle_id = ? AND odometer_km IS NOT NULL
         UNION ALL SELECT date, odometer_km, 'reading', id FROM odometer_reading WHERE vehicle_id = ?
+        UNION ALL SELECT date, odometer_km, 'fuel', id FROM fuel_entry WHERE vehicle_id = ?
         UNION ALL SELECT start_date, start_km, 'storage_start', NULL FROM storage_period
             WHERE vehicle_id = ? AND start_km IS NOT NULL
         UNION ALL SELECT end_date, end_km, 'storage_end', NULL FROM storage_period
             WHERE vehicle_id = ? AND end_km IS NOT NULL
-        ORDER BY date, odometer_km""", (vehicle_id,) * 4).fetchall()
+        ORDER BY date, odometer_km""", (vehicle_id,) * 5).fetchall()
     return [dict(r) for r in rows]
 
 
