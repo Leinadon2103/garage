@@ -1,4 +1,4 @@
-"""Extensions: backup, odometer readings, documents, specs, storage, cost overview and theme."""
+"""Extensions: backup, odometer readings, documents, specs, parts, storage, cost overview and theme."""
 import json
 import shutil
 import tempfile
@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from . import backup, crypto, db, fuel, ownership, planning
+from . import backup, crypto, db, fuel, ownership, parts, planning
 from .web import (ALLOWED, delete_files, fetch, file_response, or_400, parse_amount, parse_int, read_uploads, redirect,
                   render)
 
@@ -29,6 +29,9 @@ SPEC_EXAMPLES = {"Motorolie": "bijv. 10W-40 (Motul 7100)", "Olie-inhoud": "bijv.
                  "Bandenspanning voor": "bijv. 2,5 bar", "Bandenspanning achter": "bijv. 2,9 bar",
                  "Ketting": "bijv. DID 520VX3, 112 schakels", "Accu": "bijv. YTX12-BS", "Bougies": "bijv. NGK CR9EK",
                  "Bandenmaat": "bijv. 205/55 R16"}
+PART_SUGGESTIONS = ["Motorolie", "Oliefilter", "Afdichtring aftapplug", "Luchtfilter", "Interieurfilter", "Bougies",
+                    "Remblokken voor", "Remblokken achter", "Remvloeistof", "Koelvloeistof", "Ketting", "Kettingspray",
+                    "Tandwielset", "Accu", "Band voor", "Band achter", "Ruitenwisserbladen"]
 STORE_CHECKLIST = ["Tank volgooien (eventueel met brandstofstabilisator)", "Wassen en goed laten drogen",
                    "Ketting reinigen en smeren", "Bandenspanning iets verhogen (ca. 0,5 bar)",
                    "Accu loskoppelen of aan een druppellader", "Droog en vorstvrij wegzetten, eventueel op een paddockstand",
@@ -155,6 +158,82 @@ def delete_fuel(fid: int):
         vid = fetch(conn, "fuel_entry", fid)["vehicle_id"]
         conn.execute("DELETE FROM fuel_entry WHERE id = ?", (fid,))
     return redirect(f"/vehicles/{vid}/fuel")
+
+
+# ---------- parts and consumables (F7) ----------
+
+def part_list(conn, vid: int) -> list[dict]:
+    """Parts of a vehicle by name, each with the ids and names of the maintenance it is used for."""
+    result = []
+    for p in conn.execute("SELECT * FROM part WHERE vehicle_id = ? ORDER BY name COLLATE NOCASE, id", (vid,)):
+        types = conn.execute("SELECT t.id, t.name FROM maintenance_type t JOIN part_maintenance_type pt ON pt.type_id = t.id"
+                             " WHERE pt.part_id = ? ORDER BY t.name", (p["id"],)).fetchall()
+        result.append({**dict(p), "type_ids": [t["id"] for t in types], "type_names": [t["name"] for t in types]})
+    return result
+
+
+def needed_parts(conn, v, plan=None) -> dict:
+    return parts.needed(part_list(conn, v["id"]), plan if plan is not None else vehicle_plan(conn, v))
+
+
+@router.get("/vehicles/{vid}/parts")
+def parts_page(request: Request, vid: int, edit: int = 0, saved: int = 0):
+    with db.connect() as conn:
+        v = fetch(conn, "vehicle", vid)
+        items = part_list(conn, vid)
+        need = needed_parts(conn, v)
+        types = db.types_for(conn, v["vehicle_type"])
+    editing = next((p for p in items if p["id"] == edit), None)
+    return render(request, "parts.html", v=v, parts=items, need=need, types=types, editing=editing, saved=saved,
+                  shopping=parts.shopping_text(need["items"]), suggestions=PART_SUGGESTIONS)
+
+
+def _text(value: str, limit: int) -> str | None:
+    return value.strip()[:limit] or None
+
+
+@router.post("/vehicles/{vid}/parts")
+def save_part(vid: int, name: str = Form(""), brand: str = Form(""), part_number: str = Form(""),
+              quantity: str = Form(""), note: str = Form(""), types: list[str] = Form([]), part_id: str = Form("")):
+    if not name.strip():
+        raise HTTPException(400, "Vul in wat het is, bijvoorbeeld Oliefilter.")
+    try:
+        chosen = {int(t) for t in types}
+    except ValueError:
+        raise HTTPException(400, "Ongeldig onderhoud gekozen.")
+    with db.connect() as conn:
+        v = fetch(conn, "vehicle", vid)
+        if chosen - {t["id"] for t in db.types_for(conn, v["vehicle_type"])}:
+            raise HTTPException(400, "Ongeldig onderhoud gekozen.")
+        values = (_text(name, 80), _text(brand, 60), _text(part_number, 60), _text(quantity, 40), _text(note, 200))
+        if part_id:
+            pid = or_400(parse_int, part_id)
+            if pid is None or fetch(conn, "part", pid)["vehicle_id"] != vid:
+                raise HTTPException(404, "Niet gevonden")
+            conn.execute("UPDATE part SET name=?, brand=?, part_number=?, quantity=?, note=? WHERE id=?", (*values, pid))
+            conn.execute("DELETE FROM part_maintenance_type WHERE part_id = ?", (pid,))
+        else:
+            pid = conn.execute("INSERT INTO part (vehicle_id, name, brand, part_number, quantity, note) VALUES (?,?,?,?,?,?)",
+                               (vid, *values)).lastrowid
+        conn.executemany("INSERT INTO part_maintenance_type (part_id, type_id) VALUES (?,?)", [(pid, t) for t in chosen])
+    return redirect(f"/vehicles/{vid}/parts?saved=1")
+
+
+@router.post("/parts/{pid}/stock")
+def toggle_stock(pid: int):
+    """In stock or still to buy; the list for the next service follows."""
+    with db.connect() as conn:
+        p = fetch(conn, "part", pid)
+        conn.execute("UPDATE part SET in_stock = ? WHERE id = ?", (0 if p["in_stock"] else 1, pid))
+    return redirect(f"/vehicles/{p['vehicle_id']}/parts#needed")
+
+
+@router.post("/parts/{pid}/delete")
+def delete_part(pid: int):
+    with db.connect() as conn:
+        vid = fetch(conn, "part", pid)["vehicle_id"]
+        conn.execute("DELETE FROM part WHERE id = ?", (pid,))
+    return redirect(f"/vehicles/{vid}/parts")
 
 
 # ---------- total cost of ownership (F5) ----------

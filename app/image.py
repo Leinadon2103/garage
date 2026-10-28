@@ -7,7 +7,7 @@ lazy import httpx  # load only when searching/saving; at startup main.py only us
 lazy from PIL import Image, ImageOps
 
 # Wikimedia refuses (403) a User-Agent without contact details (https://w.wiki/4wJS); hence the project link
-HEADERS = {"User-Agent": "Garage/1.5 (https://github.com/Leinadon2103/garage)"}
+HEADERS = {"User-Agent": "Garage/1.6 (https://github.com/Leinadon2103/garage)"}
 ALLOWED_HOSTS = ("media.sketchfab.com", "upload.wikimedia.org", "thumb.wikimedia.org")
 MAX_PX = 1600
 

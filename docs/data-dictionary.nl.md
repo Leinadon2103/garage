@@ -4,7 +4,7 @@
 
 Betekenis van elke tabel en kolom in `onderhoud.db`, met toegestane waarden en herkomst. Waar een gegeven staat en hoe gevoelig het is, staat in het [gegevensregister](data-register.nl.md). Nederlandse termen en hun Engelse namen: [woordenlijst](glossary.md).
 
-Stand: schemaversie 5 (`PRAGMA user_version`). De test `tests/test_data_dictionary.py` faalt als een kolom in de database hier ontbreekt (in beide talen); voeg bij een nieuwe migratie dus ook de kolommen hier toe.
+Stand: schemaversie 6 (`PRAGMA user_version`). De test `tests/test_data_dictionary.py` faalt als een kolom in de database hier ontbreekt (in beide talen); voeg bij een nieuwe migratie dus ook de kolommen hier toe.
 
 ## Afspraken
 - **Namen** in de database zijn Engels (sinds migratie 2). **Waarden** die de gebruiker ziet blijven Nederlands: voertuigsoorten (van de RDW), documentsoorten, namen van onderhoudstypes en specificaties.
@@ -160,6 +160,28 @@ Vaste last per jaar (F5): verzekering, wegenbelasting of iets anders (stalling, 
 | `start_date` | TEXT, verplicht | Geldt vanaf | ISO-datum | handmatig |
 | `end_date` | TEXT | Geldt tot en met | ISO-datum ≥ `start_date`, of NULL (doorlopend) | handmatig |
 
+### part
+Onderdeel of verbruiksmateriaal van een voertuig (F7), zoals olie of een filter. Gekoppeld aan onderhoud via `part_maintenance_type`; `parts.needed` toont daarmee wat de volgende beurt nodig heeft.
+
+| Kolom | Type | Betekenis | Toegestane waarden | Herkomst |
+|---|---|---|---|---|
+| `id` | INTEGER | Sleutel | | automatisch |
+| `vehicle_id` | INTEGER, verplicht | Voertuig | bestaande `vehicle.id` | app |
+| `name` | TEXT, verplicht | Wat het is | vrij, max. 80 tekens (bijv. Oliefilter) | handmatig |
+| `brand` | TEXT | Merk | vrij, max. 60 tekens | handmatig |
+| `part_number` | TEXT | Artikelnummer | vrij, max. 60 tekens | handmatig |
+| `quantity` | TEXT | Hoeveelheid per beurt | vrij, max. 40 tekens (bijv. 3,2 liter) | handmatig |
+| `note` | TEXT | Opmerking | vrij, max. 200 tekens | handmatig |
+| `in_stock` | INTEGER, verplicht | Op voorraad | 0 = nog kopen, 1 = op voorraad | handmatig |
+
+### part_maintenance_type
+Bij welk onderhoud een onderdeel nodig is (veel-op-veel).
+
+| Kolom | Type | Betekenis | Toegestane waarden | Herkomst |
+|---|---|---|---|---|
+| `part_id` | INTEGER, verplicht | Onderdeel | bestaande `part.id` | app |
+| `type_id` | INTEGER, verplicht | Onderhoud | bestaande `maintenance_type.id` die bij de voertuigsoort past | handmatig |
+
 ### storage_period
 Stallingsperiode waarin het voertuig stilstaat (bijv. winterstalling). Tijdens een stalling worden geen herinneringen gestuurd.
 
@@ -245,5 +267,6 @@ Bronnen: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) en *Bra
 | 3 | `db._migration_3` | Tabel `file_key` voor de versleuteling (P1). De bestaande bestanden en velden versleutelt `db.encrypt_existing()` bij de start, niet de migratie. |
 | 4 | `db._migration_4` | Tabel `fuel_entry` voor tankbeurten en verbruik (F2). |
 | 5 | `db._migration_5` | Kosten van bezit (F5): aankoop en waarde in `vehicle`, tabel `fixed_cost`. |
+| 6 | `db._migration_6` | Onderdelen en verbruiksmaterialen (F7): tabellen `part` en `part_maintenance_type`. |
 
 Een nieuwe migratie komt achteraan in `db.MIGRATIONS` en krijgt hier een regel. Gegevens van een nieuwere versie dan de app kent, worden niet geopend en niet teruggezet.

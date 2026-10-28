@@ -94,7 +94,7 @@ def overview(services: list[dict], current_km: int | None, today: date | None = 
                 continue
             t = {"id": t["id"], "name": t["name"], "interval_km": km, "interval_months": months}
             seen[t["id"]] = {**status(t, s["odometer_km"], date.fromisoformat(s["date"]), current_km, today),
-                             "source": "custom" if custom else "rule_of_thumb"}
+                             "source": "custom" if custom else "rule_of_thumb", "type_id": t["id"]}
     order = {"red": 0, "orange": 1, "green": 2}
     return sorted(seen.values(), key=lambda st: (order[st["color"]], st["name"]))
 

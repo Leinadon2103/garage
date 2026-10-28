@@ -19,7 +19,7 @@ Status: October 2026, after version 1.3.0. This document is the handover to a ne
 - Redaction is real (`apply_redactions` + `scrub`). An unreviewed invoice never ends up in the sale PDF. EXIF is removed from photos.
 - A privacy overview in the app and in `PRIVACY.md`. Sketchfab only loads after a click.
 - Packages are pinned with hashes, with pip-audit, bandit and Dependabot (also for the GitHub Actions). License AGPL-3.0, with `LICENSES.md`.
-- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10, G9 and K3, and the conversion to English code (migration 2). Then encryption of files, sensitive fields and backups with recovery through the backup password (P1, P2, P8; [encryption.md](encryption.md)) and fill-ups with fuel consumption (F2). Schema version 4. Then total cost of ownership (F5), version 1.4.0, and a design round over the whole app: motion that explains (`static/app.js`, lists in reading order, growing bars, counting numbers; off with "reduce motion" in Windows) and fixes from a walkthrough as a user. CI runs on GitHub; the repo is public and `main` is protected (see Working agreements).
+- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10, G9 and K3, and the conversion to English code (migration 2). Then encryption of files, sensitive fields and backups with recovery through the backup password (P1, P2, P8; [encryption.md](encryption.md)) and fill-ups with fuel consumption (F2). Schema version 4. Then total cost of ownership (F5), version 1.4.0, and a design round over the whole app: motion that explains (`static/app.js`, lists in reading order, growing bars, counting numbers; off with "reduce motion" in Windows) and fixes from a walkthrough as a user. Version 1.5: a colour palette with ink blue and a colour per part of the app, and a new logo. Then parts and consumables (F7), schema version 6, version 1.6.0. CI runs on GitHub; the repo is public and `main` is protected (see Working agreements).
 
 ## Legal framework (estimate, not legal advice)
 - For personal use, Garage falls under the **household exemption** (Art. 2(2)(c) GDPR).
@@ -76,7 +76,7 @@ Done is ~~struck through~~.
 | **F4** | Search and filter in the history (type, garage, period, amount) | Convenience with a long history | small |
 | ~~**F5**~~ | ~~Total cost of ownership (TCO): depreciation, insurance, tax and maintenance per year~~ (also fuel and other fixed costs; page with animations, checked against the data visualisation guidelines) | Insight | done |
 | **F6** | Import the previous owner's history (their sale PDF as an attachment to the vehicle) | Continuous history; mind the previous owner's personal data (redaction) | medium |
-| **F7** | Parts and consumables (oil, filters) with part numbers; list "needed for the next service" | Practical for people who work on their own vehicle | medium |
+| ~~**F7**~~ | ~~Parts and consumables (oil, filters) with part numbers; list "needed for the next service"~~ (linked to maintenance; in stock or still to buy, and a shopping list to copy) | Practical for people who work on their own vehicle | done |
 | **F8** | Notify about a new version through GitHub Releases, only with consent | Updates without telemetry | small |
 | **F9** | Accessibility (WCAG 2.2: keyboard, contrast, screen reader) | Quality, and needed if others start using the app | medium |
 | ~~**F10**~~ | Dropped (Daniel's decision, October 2026): Garage focuses on maintenance and a good sale PDF, not on day-to-day tracking; hardly anyone enters an odometer reading at every fill-up. Originally: entry on the go: fill-ups, odometer readings and invoice photos from the phone. Option a: an import folder (e.g. in OneDrive) that Garage picks up, encrypts and empties. Option b: pairing over the local network with a QR code and a one-time token, only while the screen is open (requires S4 and a threat model in K6) | Fill-ups and invoices happen away from the pc and are otherwise forgotten; F2 makes this more pressing. Option a briefly leaves the original unencrypted in the cloud | medium |
@@ -102,13 +102,13 @@ Done is ~~struck through~~.
 3. **Trust for the buyer:** G4, G6, G7, and with it F3.
 4. **Finishing:** S1, P5, P7 with F11, ~~P8~~ (done, with P1), G5, G8, K1, K2.
 5. **Professionalisation, spread out:** K4 to K9. If the app goes to others: K4, K5 and F8 together as a release pipeline, before S5 and F9.
-6. **Next steps, chosen by Daniel (October 2026):** ~~F2~~, ~~S4~~, ~~F5~~ (done), then F7 and F3, each as its own PR. F1 and F4 on request; F10 dropped. Guideline: maintenance and a strong sale PDF come before day-to-day tracking.
+6. **Next steps, chosen by Daniel (October 2026):** ~~F2~~, ~~S4~~, ~~F5~~, ~~F7~~ (done), then F3, each as its own PR. F1 and F4 on request; F10 dropped. Guideline: maintenance and a strong sale PDF come before day-to-day tracking.
 
 ## Open decisions for Daniel
 1. ~~Will the GitHub repo be public?~~ Yes, the repo is public. Still open: will the app be actively given to others? That decides S5, F8 and F9.
 2. ~~P1: DPAPI or an own password?~~ Decided: DPAPI for the data on this pc (P1), a password on the backup (P2), so a restore on another pc works. Worked out in K6.
 3. P3: after a sale erase everything or keep an anonymised archive?
-4. ~~Which features are preferred?~~ Decided: F2, S4 and F5 (done), F7 and F3, in that order (see Suggested order, step 6).
+4. ~~Which features are preferred?~~ Decided: F2, S4, F5 and F7 (done), then F3, in that order (see Suggested order, step 6).
 5. Does Python 3.15 remain the base? The ecosystem is still catching up (see pyyaml, Dependabot), but `lazy import` depends on it.
 6. Which language for commit messages: English (fits the code) or Dutch?
 7. ~~F10: import folder or pairing over the local network?~~ Dropped with F10.

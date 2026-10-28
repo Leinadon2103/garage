@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Onderdelen{% endblock %}
+{% block section %}sec-maint{% endblock %}
+{% block content %}
+<a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
+<div class="header"><div><div class="eyebrow">{{ v.license_plate|plate }}</div><h1>Onderdelen en verbruiksmaterialen</h1>
+  <p class="muted">Leg vast welke olie, filters en onderdelen in dit voertuig horen, met merk en artikelnummer.
+    Koppel ze aan het onderhoud waarbij je ze nodig hebt; dan zie je bovenaan wat er voor de volgende beurt klaar moet liggen.</p></div></div>
+
+{% if saved %}<div class="notice ok">{{ icon("check") }}<p>Onderdeel opgeslagen.</p></div>{% endif %}
+
+<section class="section" id="needed" style="margin-top:0">
+  <div class="header" style="margin-bottom:14px;align-items:center">
+    <h2 style="margin:0;display:flex;gap:10px;align-items:center">{{ icon("list-checks", "accent") }} Nodig voor de volgende beurt</h2>
+    {% if need.to_buy %}
+    <button type="button" class="btn ghost small" data-copy="{{ shopping }}">{{ icon("clipboard-list") }} <span>Kooplijst kopiëren</span></button>
+    {% endif %}
+  </div>
+  {% if need.service %}
+  <div class="next-service">
+    {% for s in need.service %}<span class="chip {{ {'red': 'bad', 'orange': 'warn'}.get(s.color, '') }}">{{ s.name }} · {{ s.text }}</span>{% endfor %}
+  </div>
+  {% if need["items"] %}
+  <ul class="needed-list">
+    {% for p in need["items"] %}
+    <li class="{{ 'in-stock' if p.in_stock }}">
+      <span class="what"><strong>{{ p.name }}</strong>
+        <small class="muted">{{ [p.brand, p.part_number]|select|join(" ") }}{% if p.quantity %}{{ " · " if p.brand or p.part_number }}{{ p.quantity }}{% endif %}
+          {% if need.service|length > 1 %}· voor {{ p["for"]|join(", ") }}{% endif %}</small></span>
+      <form method="post" action="/parts/{{ p.id }}/stock">
+        <button class="stock-toggle {{ 'on' if p.in_stock }}" aria-pressed="{{ 'true' if p.in_stock else 'false' }}"
+                title="{{ 'Weer op de kooplijst zetten' if p.in_stock else 'Markeren als op voorraad' }}">
+          {{ icon("check") }} {{ "Op voorraad" if p.in_stock else "Nog kopen" }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">Er zijn nog geen onderdelen gekoppeld aan {{ need.service|map(attribute="name")|join(" of ") }}. Voeg ze hieronder toe en kies bij welk onderhoud ze horen.</p>
+  {% endif %}
+  {% else %}
+  <p class="muted">Nog geen onderhoud om te plannen. Zodra er een beurt met bijvoorbeeld olie vervangen is vastgelegd, verschijnt hier wat je voor de volgende keer nodig hebt.</p>
+  {% endif %}
+</section>
+
+<form method="post" action="/vehicles/{{ v.id }}/parts" class="card" id="part-form" style="margin-top:28px">
+  <h2>{{ icon("pencil" if editing else "plus") }} {{ "Onderdeel bewerken" if editing else "Onderdeel toevoegen" }}</h2>
+  {% if editing %}<input type="hidden" name="part_id" value="{{ editing.id }}">{% endif %}
+  <div class="fields">
+    <div class="field"><label for="part-name">Wat</label><input id="part-name" name="name" list="part-suggestions" maxlength="80" required
+      value="{{ editing.name if editing else '' }}" placeholder="bijv. Oliefilter"></div>
+    <div class="field"><label for="part-brand">Merk (optioneel)</label><input id="part-brand" name="brand" maxlength="60"
+      value="{{ editing.brand or '' if editing else '' }}" placeholder="bijv. HiFlo"></div>
+    <div class="field"><label for="part-number">Artikelnummer (optioneel)</label><input id="part-number" name="part_number" maxlength="60"
+      value="{{ editing.part_number or '' if editing else '' }}" placeholder="bijv. HF303"></div>
+    <div class="field"><label for="part-quantity">Hoeveelheid (optioneel)</label><input id="part-quantity" name="quantity" maxlength="40"
+      value="{{ editing.quantity or '' if editing else '' }}" placeholder="bijv. 1 stuk of 3,2 liter"></div>
+  </div>
+  <datalist id="part-suggestions">{% for s in suggestions %}<option value="{{ s }}">{% endfor %}</datalist>
+  <div class="field">
+    <span class="field-header">Nodig bij welk onderhoud?</span>
+    <details class="dropdown" data-placeholder="Kies onderhoud… (optioneel)">
+      <summary><span class="placeholder">Kies onderhoud… (optioneel)</span></summary>
+      <div class="panel">
+        <input type="search" placeholder="Zoeken…" aria-label="Onderhoud zoeken">
+        <ul>
+          {% for t in types %}
+          <li><label><input type="checkbox" name="types" value="{{ t.id }}" {% if editing and t.id in editing.type_ids %}checked{% endif %}> {{ t.name }}</label></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
+  </div>
+  <div class="field"><label for="part-note">Opmerking (optioneel)</label><input id="part-note" name="note" maxlength="200"
+    value="{{ editing.note or '' if editing else '' }}" placeholder="bijv. te koop bij Louis, ook passend: Mahle OC 575"></div>
+  <div class="row">
+    <button class="btn">{{ icon("check") }} {{ "Opslaan" if editing else "Toevoegen" }}</button>
+    {% if editing %}<a href="/vehicles/{{ v.id }}/parts" class="btn ghost">Annuleren</a>{% endif %}
+  </div>
+</form>
+
+<section class="section">
+  <h2>{{ icon("box") }} Alle onderdelen</h2>
+  {% if parts %}
+  <div class="card table-wrap"><table>
+    <thead><tr><th>Onderdeel</th><th>Merk en artikelnummer</th><th>Hoeveelheid</th><th>Bij onderhoud</th><th>Voorraad</th><th></th></tr></thead>
+    <tbody>
+    {% for p in parts %}
+    <tr>
+      <td><strong>{{ p.name }}</strong>{% if p.note %}<br><small class="muted">{{ p.note }}</small>{% endif %}</td>
+      <td>{{ [p.brand, p.part_number]|select|join(" ") or "–" }}</td>
+      <td>{{ p.quantity or "–" }}</td>
+      <td>{% for n in p.type_names %}<span class="chip accent">{{ n }}</span> {% else %}<span class="muted">–</span>{% endfor %}</td>
+      <td>{{ "op voorraad" if p.in_stock else "–" }}</td>
+      <td class="actions">
+        <a href="/vehicles/{{ v.id }}/parts?edit={{ p.id }}#part-form" aria-label="{{ p.name }} bewerken">{{ icon("pencil") }}</a>
+        <form method="post" action="/parts/{{ p.id }}/delete" onsubmit='return confirm({{ (p.name ~ " verwijderen?")|tojson }})'>
+          <button class="link-button" aria-label="{{ p.name }} verwijderen">{{ icon("trash-2") }}</button></form></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="muted">Nog geen onderdelen. Begin bijvoorbeeld met de motorolie en het oliefilter.</p>{% endif %}
+</section>
+{% endblock %}

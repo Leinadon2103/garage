@@ -1,6 +1,8 @@
+// Behaviour shared by all pages.
 // Motion that explains, everywhere in the app (the list-by-list entrance is pure CSS, see app.css "Motion"):
 // - parts marked data-reveal build up when they come into view (charts rise, lines draw);
 // - numbers count up to their value.
+// Further: multi-select dropdowns and copy buttons (bottom of this file).
 // Without JavaScript or with "reduce motion" in Windows everything is simply there in its final state: the real
 // values are always in the HTML, the animation only counts towards them.
 (() => {
@@ -50,6 +52,44 @@
     parts.forEach(el => seen.observe(el));
   }
 
+  // Multi-select (details.dropdown with checkboxes): the choice as chips in the header, a search field, and
+  // closing when you click elsewhere. Code that ticks boxes itself sends a "change" event to the dropdown.
+  function dropdowns() {
+    document.querySelectorAll("details.dropdown").forEach(dd => {
+      const header = dd.querySelector("summary");
+      const placeholder = dd.dataset.placeholder || "Kies…";
+      const update = () => {
+        const names = [...dd.querySelectorAll("input[type=checkbox]:checked")].map(i => i.parentElement.textContent.trim());
+        header.replaceChildren(...(names.length
+          ? names.map(n => Object.assign(document.createElement("span"), {className: "chip accent", textContent: n}))
+          : [Object.assign(document.createElement("span"), {className: "placeholder", textContent: placeholder})]));
+      };
+      dd.addEventListener("change", update);
+      dd.querySelector("input[type=search]")?.addEventListener("input", e => {
+        const q = e.target.value.toLowerCase();
+        dd.querySelectorAll("li").forEach(li => li.hidden = !li.textContent.toLowerCase().includes(q));
+      });
+      document.addEventListener("click", e => { if (!dd.contains(e.target)) dd.open = false; });
+      update();
+    });
+  }
+
+  // Copy buttons (data-copy): the text to the clipboard, with a short confirmation on the button
+  function copyButtons() {
+    document.querySelectorAll("button[data-copy]").forEach(b => b.addEventListener("click", async () => {
+      const label = b.querySelector("span");
+      const before = label.textContent;
+      try {
+        await navigator.clipboard.writeText(b.dataset.copy);
+        label.textContent = "Gekopieerd";
+      } catch {
+        label.textContent = "Kopiëren lukte niet";
+      }
+      setTimeout(() => { label.textContent = before; }, 1800);
+    }));
+  }
+
   html.classList.add("js");
-  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", start) : start();
+  const ready = () => { start(); dropdowns(); copyButtons(); };
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", ready) : ready();
 })();
