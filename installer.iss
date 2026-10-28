@@ -2,7 +2,7 @@
 ; Installs per user (no admin rights needed) and registers itself under Settings > Apps.
 ; Texts the user sees are Dutch.
 
-#define Version "1.4.0"
+#define Version "1.5.0"
 
 [Setup]
 AppId={{8E3B6C52-4D0B-4A8E-9C1F-6A2D7E5B9F10}

@@ -48,10 +48,10 @@
     })();
   </script>
 </head>
-<body>
+<body class="{% block section %}{% endblock %}">
   <header class="topbar">
     <div class="wrap">
-      <a href="/" class="logo"><span class="logo-mark">{{ icon("wrench") }}</span> Garage</a>
+      <a href="/" class="logo"><img class="logo-mark" src="/static/favicon.svg" alt="" width="34" height="34"> Garage</a>
       <nav class="nav">
         {% set path = request.url.path %}
         <a href="/" class="{{ 'active' if path == '/' or path.startswith(('/vehicles', '/services', '/invoices', '/documents')) }}" aria-label="Voertuigen">{{ icon("car") }}<span>Voertuigen</span></a>

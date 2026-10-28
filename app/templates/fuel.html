@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Tanken{% endblock %}
+{% block section %}sec-fuel{% endblock %}
 {% macro dec(value, digits=1) %}{{ ("%." ~ digits ~ "f")|format(value)|replace(".", ",") }}{% endmacro %}
 {% block content %}
 <a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
