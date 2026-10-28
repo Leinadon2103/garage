@@ -11,7 +11,7 @@
   <div><small class="muted">Gemiddeld per jaar</small><strong>{{ (total / per_year.bars|length)|euro if per_year.bars else "–" }}</strong><small class="muted">over {{ per_year.bars|length }} jaar</small></div>
 </div>
 
-<section class="section">
+<section class="section" data-reveal>
   <h2>{{ icon("chart-column") }} Uitgaven per jaar</h2>
   <div class="card">
   {% if per_year.bars %}
@@ -26,7 +26,7 @@
       {% set x = 52 + (loop.index0 + 0.5) * (940 / n) - width / 2 %}
       {% set h = [b.height * 170, 2]|max %}
       {% set top = 196 - h %}
-      <g class="bar-group" tabindex="0" data-tip="{{ b.year }}: {{ b.amount|euro }}">
+      <g class="bar-group" tabindex="0" style="--i: {{ loop.index0 }}" data-tip="{{ b.year }}: {{ b.amount|euro }}">
         <rect x="{{ x - 6 }}" y="20" width="{{ width + 12 }}" height="176" fill="transparent"/>
         <path class="bar" d="M{{ x }},196 V{{ top + 4 }} Q{{ x }},{{ top }} {{ x + 4 }},{{ top }} H{{ x + width - 4 }} Q{{ x + width }},{{ top }} {{ x + width }},{{ top + 4 }} V196 Z"/>
       </g>
@@ -54,7 +54,7 @@
 </section>
 {% endif %}
 
-<section class="section" id="odometer">
+<section class="section" id="odometer" data-reveal>
   <h2>{{ icon("gauge") }} Km-verloop</h2>
   <div class="card">
   {% if km %}
@@ -66,7 +66,7 @@
       {% endfor %}
       {% set line %}{% for p in points %}{{ "M" if loop.first else "L" }}{{ 68 + p.x * 920 }},{{ 196 - p.y * 170 }} {% endfor %}{% endset %}
       <path class="area" d="{{ line }}L{{ 68 + points[-1].x * 920 }},196 L{{ 68 + points[0].x * 920 }},196 Z"/>
-      <path class="line" d="{{ line }}"/>
+      <path class="line" d="{{ line }}" pathLength="1"/>
       {% for p in points %}
       <circle class="hit" cx="{{ 68 + p.x * 920 }}" cy="{{ 196 - p.y * 170 }}" r="12" tabindex="0" data-tip="{{ p.date|short_date }}: {{ p.km|km }} km"/>
       <circle class="point" cx="{{ 68 + p.x * 920 }}" cy="{{ 196 - p.y * 170 }}" r="4"/>

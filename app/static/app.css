@@ -128,7 +128,8 @@ main.wrap { padding-top: 28px; padding-bottom: 80px; }
 /* ----- forms ----- */
 label, .field-header { display: block; font-size: .85rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
 .field { margin-bottom: 18px; }
-input[type=text], input:not([type]), input[type=number], input[type=date], input[type=search], select, textarea {
+input[type=text], input:not([type]), input[type=number], input[type=date], input[type=search], input[type=password],
+input[type=email], input[type=tel], select, textarea {
   width: 100%; height: 44px; padding: 0 14px; border-radius: var(--r-sm); border: 1px solid var(--line-2);
   background: var(--field); color: var(--text); font: inherit; transition: border-color .15s, box-shadow .15s; }
 textarea { height: auto; padding: 10px 14px; resize: vertical; }
@@ -219,7 +220,7 @@ label.upload { font-size: .95rem; font-weight: 400; margin: 0; }
 .new-card:hover { border-color: var(--accent); color: var(--accent-2); background: var(--accent-soft); }
 .new-card .i { width: 36px; height: 36px; margin-bottom: 8px; }
 .empty { text-align: center; padding: 60px 20px; }
-.empty .i { width: 56px; height: 56px; color: var(--accent); stroke-width: 1.4; margin-bottom: 12px; }
+.empty > .i { width: 56px; height: 56px; color: var(--accent); stroke-width: 1.4; margin-bottom: 12px; }
 
 /* ----- hero (vehicle) ----- */
 .hero { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 28px; align-items: stretch; }
@@ -230,7 +231,7 @@ label.upload { font-size: .95rem; font-weight: 400; margin: 0; }
 .viewer > img { object-fit: cover; }
 .viewer .fallback { filter: blur(2px) brightness(.6); }
 .viewer .empty-image { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--muted); }
-.viewer .empty-image .i { width: 80px; height: 80px; stroke-width: 1; color: var(--dim); margin-bottom: 10px; }
+.viewer .empty-image > div > .i, .viewer .empty-image > .i { width: 80px; height: 80px; stroke-width: 1; color: var(--dim); margin-bottom: 10px; }
 .viewer .load-3d { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; }
 .viewer .load-3d p { margin: 10px 0 0; font-size: .85rem; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
 .viewer .viewer-actions { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 8px; z-index: 2; }
@@ -244,6 +245,7 @@ label.upload { font-size: .95rem; font-weight: 400; margin: 0; }
 .specs { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line);
   border-radius: var(--r-sm); overflow: hidden; }
 .specs div { background: var(--card); padding: 12px 14px; }
+.specs div:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .specs dt { font-size: .75rem; color: var(--muted); }
 .specs dd { margin: 2px 0 0; font-weight: 600; }
 .hero-info .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: auto; }
@@ -371,7 +373,7 @@ select { appearance: none; padding-right: 36px; background-image: linear-gradien
 .km-quick { display: flex; gap: 8px; margin-top: 10px; }
 .km-quick input { height: 36px; max-width: 140px; }
 .km-quick .btn { height: 36px; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; margin-top: 16px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; margin-top: 16px; }
 .tile { display: flex; gap: 12px; align-items: center; padding: 14px 16px; background: var(--card); border: 1px solid var(--line);
   border-radius: var(--r-sm); color: var(--text); box-shadow: var(--shadow); transition: border-color .15s, transform .15s; }
 .tile:hover { border-color: var(--accent); color: var(--text); transform: translateY(-1px); }
@@ -493,3 +495,67 @@ html.js [data-reveal]:not(.is-in) .tco-chart .bar-total { opacity: 0; }
   html.js [data-reveal] .tco-chart .bar-total { opacity: 1; }
   html.js [data-reveal] .share-seg { flex-grow: var(--v); }
 }
+
+/* ===== Motion everywhere: lists enter in reading order, bars grow to their value, charts build up =====
+   Pure CSS, so it is there from the very first paint (no flash). 'backwards': after the animation the normal
+   styles (e.g. the hover lift of a card) work as before. "Reduce motion" in Windows switches all of it off. */
+html { scroll-behavior: smooth; }
+html.js main.wrap { animation: page-in .35s ease-out backwards; }
+@keyframes page-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
+@keyframes fade-only { from { opacity: 0; } }
+@keyframes grow-x { from { transform: scaleX(0); } }
+@keyframes draw { from { stroke-dashoffset: 1; } }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > * { animation: rise-in .5s cubic-bezier(.2, .8, .2, 1) backwards; }
+html.js .card tbody > tr { animation: fade-only .4s ease backwards; }
+html.js .planning .progress span { transform-origin: left; animation: grow-x .9s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: 250ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(2), html.js .card tbody > tr:nth-child(2) { animation-delay: 55ms; }
+html.js .planning > :nth-child(2) .progress span { animation-delay: 305ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(3), html.js .card tbody > tr:nth-child(3) { animation-delay: 110ms; }
+html.js .planning > :nth-child(3) .progress span { animation-delay: 360ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(4), html.js .card tbody > tr:nth-child(4) { animation-delay: 165ms; }
+html.js .planning > :nth-child(4) .progress span { animation-delay: 415ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(5), html.js .card tbody > tr:nth-child(5) { animation-delay: 220ms; }
+html.js .planning > :nth-child(5) .progress span { animation-delay: 470ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(6), html.js .card tbody > tr:nth-child(6) { animation-delay: 275ms; }
+html.js .planning > :nth-child(6) .progress span { animation-delay: 525ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(7), html.js .card tbody > tr:nth-child(7) { animation-delay: 330ms; }
+html.js .planning > :nth-child(7) .progress span { animation-delay: 580ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(8), html.js .card tbody > tr:nth-child(8) { animation-delay: 385ms; }
+html.js .planning > :nth-child(8) .progress span { animation-delay: 635ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(9), html.js .card tbody > tr:nth-child(9) { animation-delay: 440ms; }
+html.js .planning > :nth-child(9) .progress span { animation-delay: 690ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(10), html.js .card tbody > tr:nth-child(10) { animation-delay: 495ms; }
+html.js .planning > :nth-child(10) .progress span { animation-delay: 745ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(11), html.js .card tbody > tr:nth-child(11) { animation-delay: 550ms; }
+html.js .planning > :nth-child(11) .progress span { animation-delay: 800ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(12), html.js .card tbody > tr:nth-child(12) { animation-delay: 605ms; }
+html.js .planning > :nth-child(12) .progress span { animation-delay: 855ms; }
+html.js :is(.garage, .stats, .tiles, .planning, .timeline, .key-figures, .checklist, .fixed-list, .subnav) > :nth-child(n+13), html.js .card tbody > tr:nth-child(n+13) { animation-delay: 660ms; }
+html.js .notice { animation: pop .45s cubic-bezier(.2, .9, .3, 1.3) backwards; }
+
+/* cost and km chart: bars rise year by year, the km line draws from left to right (time runs that way) */
+.chart .line { stroke-dasharray: 1; }
+.chart .bar-group { transform-box: fill-box; transform-origin: 50% 100%; }
+html.js [data-reveal]:not(.is-in) .chart .bar-group { transform: scaleY(0); }
+html.js [data-reveal].is-in .chart .bar-group { animation: rise .8s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+html.js [data-reveal]:not(.is-in) .chart .line { stroke-dashoffset: 1; }
+html.js [data-reveal].is-in .chart .line { animation: draw 1.4s cubic-bezier(.4, 0, .2, 1) backwards; }
+html.js [data-reveal]:not(.is-in) .chart :is(.area, .point) { opacity: 0; }
+html.js [data-reveal].is-in .chart .area { animation: fade-only .8s ease .5s backwards; }
+html.js [data-reveal].is-in .chart .point { animation: fade-only .3s ease 1.2s backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  html.js *, html.js *::before, html.js *::after { animation: none !important; }
+  html.js [data-reveal]:not(.is-in) .chart .bar-group { transform: none; }
+  html.js [data-reveal] .chart .line { stroke-dashoffset: 0; }
+  html.js [data-reveal] .chart :is(.area, .point) { opacity: 1; }
+}
+
+/* settings: jump to a part */
+.subnav { display: flex; flex-wrap: wrap; gap: 8px; margin: -6px 0 20px; }
+.subnav a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: .88rem; font-weight: 600;
+  color: var(--text); background: var(--card); border: 1px solid var(--line); transition: border-color .15s, background .15s; }
+.subnav a:hover, .subnav a:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+:target { scroll-margin-top: 80px; }

@@ -19,7 +19,7 @@ Stand: oktober 2026, na versie 1.3.0. Dit document is de overdracht naar een nie
 - Weglakken is echt (`apply_redactions` + `scrub`). Een ongecontroleerde factuur komt nooit in de verkoop-PDF. Van foto's wordt EXIF verwijderd.
 - Een privacyoverzicht in de app en in `PRIVACY.md`. Sketchfab laadt pas na een klik.
 - Pakketten liggen vast met hashes, met pip-audit, bandit en Dependabot (ook voor de GitHub Actions). Licentie AGPL-3.0, met `LICENSES.md`.
-- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10, G9 en K3, en de omzetting naar Engelse code (migratie 2). Daarna versleuteling van bestanden, gevoelige velden en back-ups met herstel via het back-upwachtwoord (P1, P2, P8; [encryption.nl.md](encryption.nl.md)) en tankbeurten met verbruik (F2). Schemaversie 4. CI draait op GitHub; de repo is openbaar en `main` is beschermd (zie Werkafspraken).
+- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10, G9 en K3, en de omzetting naar Engelse code (migratie 2). Daarna versleuteling van bestanden, gevoelige velden en back-ups met herstel via het back-upwachtwoord (P1, P2, P8; [encryption.nl.md](encryption.nl.md)) en tankbeurten met verbruik (F2). Schemaversie 4. Daarna kosten van bezit (F5), versie 1.4.0, en een ontwerpronde over de hele app: beweging die uitlegt (`static/app.js`, lijsten in leesvolgorde, groeiende balken, optellende getallen; uit bij "beweging beperken" in Windows) en fixes uit een rondgang als gebruiker. CI draait op GitHub; de repo is openbaar en `main` is beschermd (zie Werkafspraken).
 
 ## Juridisch kader (inschatting, geen juridisch advies)
 - Voor eigen gebruik valt Garage onder de **huishoudelijke uitzondering** (art. 2 lid 2 sub c AVG).
