@@ -31,7 +31,7 @@ def _nl_date(iso: str | None) -> str:
 
 
 ORANGE = colors.HexColor("#f26b0f")
-DARK_BLUE = colors.HexColor("#2c3e50")
+DARK_BLUE = colors.HexColor("#16233a")  # the ink blue of the app (--bar)
 
 
 def _table(rows, widths, header=True) -> Table:

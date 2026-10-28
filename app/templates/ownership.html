@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Kosten van bezit{% endblock %}
+{% block section %}sec-money{% endblock %}
 {% set kind_names = {"insurance": "Verzekering", "road_tax": "Wegenbelasting", "other": "Overig"} %}
 {% macro money(x) %}{{ x|euro|replace(",00", "") if x >= 100 else x|euro }}{% endmacro %}
 {% macro pct(x) %}{{ (x * 100)|round|int }}%{% endmacro %}

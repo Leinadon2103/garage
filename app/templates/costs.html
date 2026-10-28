@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Kosten en km{% endblock %}
+{% block section %}sec-money{% endblock %}
 {% block content %}
 <a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
 <div class="header"><div><div class="eyebrow">{{ v.license_plate|plate }}</div><h1>Kosten en km-verloop</h1></div></div>

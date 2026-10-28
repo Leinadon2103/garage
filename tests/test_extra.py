@@ -377,8 +377,8 @@ def test_title_bar_colors_equal_to_css():
     dark = css[css.index(":root[data-dark]"):]
     for block, (bar, text, line) in ((light, garage.BAR_LIGHT), (dark, garage.BAR_DARK)):
         assert re.search(r"--bar: (#\w+)", block).group(1) == bar
-        assert re.search(r"--text: (#\w+)", block).group(1) == text
-        assert re.search(r"--line: (#\w+)", block).group(1) == line
+        assert re.search(r"--bar-text: (#\w+)", block).group(1) == text
+        assert re.search(r"--bar-line: (#\w+)", block).group(1) == line
     assert garage.mix(garage.BAR_LIGHT, garage.BAR_DARK, 0) == garage.BAR_LIGHT
     assert garage.mix(garage.BAR_LIGHT, garage.BAR_DARK, 1) == garage.BAR_DARK
     assert garage.starts_dark("dark") is True and garage.starts_dark("light") is False

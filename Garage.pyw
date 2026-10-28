@@ -24,10 +24,10 @@ MUTEX_NAME = os.environ.get("GARAGE_MUTEX", "Garage-Voertuigonderhoud")
 TITLE = "Garage"
 APP_ID = "Garage.Voertuigonderhoud"  # Windows app id for notifications (also in installer.iss)
 DATA_ENV = "GARAGE_DATA"             # overrides the data folder; ONDERHOUD_DATA is the old name and still works
-# (background, text, border) equal to --bar / --text / --line in app/static/app.css (light and dark),
+# (background, text, border) equal to --bar / --bar-text / --bar-line in app/static/app.css (light and dark),
 # so the title bar and the app's top bar look like one piece
-BAR_LIGHT = ("#ffffff", "#14171c", "#e4e7ec")
-BAR_DARK = ("#181b21", "#eceef2", "#2a2f38")
+BAR_LIGHT = ("#16233a", "#eef2f8", "#16233a")
+BAR_DARK = ("#0f1726", "#e9edf4", "#263043")
 
 
 def documents() -> Path:
@@ -123,8 +123,8 @@ def mix(start: tuple, end: tuple, t: float) -> tuple:
 def color_title_bar(hwnd: int, colors: tuple = BAR_LIGHT, dark: bool | None = None) -> None:
     """Title bar in the color of the app's top bar (Windows 11; on older Windows nothing happens)."""
     dwm = ctypes.windll.dwmapi
-    if dark is not None:  # light or dark buttons (minimize, close, ...)
-        value = ctypes.c_int(1 if dark else 0)
+    if dark is not None:  # the top bar is dark in both themes, so always light buttons (minimize, close, ...)
+        value = ctypes.c_int(1)
         dwm.DwmSetWindowAttribute(wintypes.HWND(hwnd), 20, ctypes.byref(value), 4)  # USE_IMMERSIVE_DARK_MODE
     for attribute, color in zip((35, 36, 34), colors):  # caption, text, border
         r, g, b = _rgb(color)

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Stalling{% endblock %}
+{% block section %}sec-neutral{% endblock %}
 {% block content %}
 <a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
 <div class="header"><div><div class="eyebrow">{{ v.license_plate|plate }}</div>
