@@ -63,7 +63,7 @@ Gedaan staat ~~doorgestreept~~.
 | **S1** | Strikte CSP: alle `onclick`/`onsubmit` naar `static/app.js`, dan `script-src 'self'` | Ingevoegde code kan dan niet meer draaien | middel |
 | ~~**S2**~~ | ~~GitHub Actions (Windows-runner): tests, pip-audit en bandit bij elke push en Dependabot-PR~~ | Dependabot-PR's werden nergens getest | gedaan |
 | ~~**S3**~~ | ~~Rooktest van de exe: `Garage.exe --self-test`, in `build.bat`~~ | De gebouwde exe werd nooit automatisch getest | gedaan |
-| **S4** | Een willekeurig sessietoken in een cookie, gezet via de start-URL | Andere Windows-gebruikers op dezelfde pc kunnen nu bij de server, en die geeft ontsleutelde bestanden: P1 beschermt de schijf, niet de draaiende app | klein |
+| ~~**S4**~~ | ~~Een willekeurig sessietoken in een cookie, gezet via de start-URL~~ | Andere Windows-gebruikers op dezelfde pc kunnen nu bij de server, en die geeft ontsleutelde bestanden: P1 beschermt de schijf, niet de draaiende app | gedaan |
 | **S5** | Ondertekenen van de exe (Azure Trusted Signing, ca. €10 per maand), SHA-256 bij releases, `SECURITY.md` | Echtheid voor gebruikers, geen SmartScreen-waarschuwing | middel, kost geld |
 | **S6** | PDF's openen in een apart proces met een tijdslimiet | Een kwaadaardige PDF kan de app dan niet laten hangen of crashen | middel |
 
@@ -79,7 +79,7 @@ Gedaan staat ~~doorgestreept~~.
 | **F7** | Onderdelen en verbruiksmaterialen (olie, filters) met artikelnummers; lijst "nodig voor de volgende beurt" | Praktisch voor wie zelf sleutelt | middel |
 | **F8** | Melden van een nieuwe versie via GitHub Releases, alleen na toestemming | Updates zonder telemetrie | klein |
 | **F9** | Toegankelijkheid (WCAG 2.2: toetsenbord, contrast, schermlezer) | Kwaliteit, en nodig als anderen de app gaan gebruiken | middel |
-| **F10** | Invoeren onderweg: tankbeurten, km-standen en foto's van facturen vanaf de telefoon. Optie a: een importmap (bijv. in OneDrive) die Garage oppikt, versleutelt en leegmaakt. Optie b: koppelen via het lokale netwerk met een QR-code en een eenmalig token, alleen zolang het scherm openstaat (vereist S4 en een dreigingsanalyse in K6) | Tanken en facturen gebeuren buiten de pc en worden anders vergeten; F2 maakt dit dringender. Bij optie a staat het origineel kort onversleuteld in de cloud | middel |
+| ~~**F10**~~ | Vervallen (besluit Daniel, oktober 2026): Garage richt zich op onderhoud en een goede verkoop-PDF, niet op dagelijks bijhouden; bij elke tankbeurt een km-stand invoeren doet bijna niemand. Oorspronkelijk: invoeren onderweg: tankbeurten, km-standen en foto's van facturen vanaf de telefoon. Optie a: een importmap (bijv. in OneDrive) die Garage oppikt, versleutelt en leegmaakt. Optie b: koppelen via het lokale netwerk met een QR-code en een eenmalig token, alleen zolang het scherm openstaat (vereist S4 en een dreigingsanalyse in K6) | Tanken en facturen gebeuren buiten de pc en worden anders vergeten; F2 maakt dit dringender. Bij optie a staat het origineel kort onversleuteld in de cloud | middel |
 | **F11** | Prullenbak: verwijderde beurten, facturen en documenten blijven 30 dagen versleuteld bewaard en worden daarna echt gewist (termijn via P7) | Met `secure_delete` en crypto-shredding is een verkeerde klik definitief; alleen een back-up van tot een week oud helpt | middel |
 
 ### Codekwaliteit en professionalisering
@@ -90,7 +90,7 @@ Gedaan staat ~~doorgestreept~~.
 | ~~**K3**~~ | ~~Back-up controleren na het maken: zip openen en `PRAGMA integrity_check`~~ | De back-up is de enige kopie van de originelen; P2 bouwt erop voort | gedaan |
 | **K4** | Exe en installatieprogramma bouwen in CI, met SHA-256 en GitHub artifact attestation | Aantoonbaar gebouwd uit deze broncode; gratis deel van S5 | middel |
 | **K5** | `CHANGELOG.md`, één plek voor het versienummer, git-tags | Releases navolgbaar | klein |
-| **K6** | Korte dreigingsanalyse en vastgelegde ontwerpbeslissingen (bijv. DPAPI of wachtwoord). P1/P2: [encryption.nl.md](encryption.nl.md); S4 nog open | Keuzes in P1/P2 en S4 uitlegbaar | klein |
+| **K6** | Korte dreigingsanalyse en vastgelegde ontwerpbeslissingen (bijv. DPAPI of wachtwoord). P1/P2 en S4: [encryption.nl.md](encryption.nl.md) | Keuzes in P1/P2 en S4 uitlegbaar | klein |
 | **K7** | Regel en test: `app.log` bevat geen inhoud van facturen of lak-termen | Logbestanden lekken anders persoonsgegevens | klein |
 | **K8** | Licentiecontrole (bijv. `pip-licenses`) en SBOM in CI | `LICENSES.md` veroudert niet ongemerkt; AGPL-verplichtingen | klein |
 | **K9** | Coverage (`pytest-cov`) | Zien welke paden geen test hebben, vooral bij terugzetten en migreren | klein |
@@ -98,17 +98,17 @@ Gedaan staat ~~doorgestreept~~.
 
 ## Voorgestelde volgorde
 1. ~~**Fundament:** S2, S3, G1, G2, G3.~~ Gedaan, met P9, P10, G9 en de omzetting naar Engelse code.
-2. **Grootste privacywinst:** ~~K3~~, ~~P1 + P2~~ (gedaan), dan S4 (naar voren gehaald: zonder S4 beschermt P1 niet tegen andere gebruikers op dezelfde pc), daarna P3, P4 en P6.
+2. **Grootste privacywinst:** ~~K3~~, ~~P1 + P2~~, ~~S4~~ (gedaan), daarna P3, P4 en P6.
 3. **Vertrouwen voor de koper:** G4, G6, G7, en daarbij F3.
 4. **Afronden:** S1, P5, P7 met F11, ~~P8~~ (gedaan, met P1), G5, G8, K1, K2.
 5. **Professionalisering, verspreid:** K4 t/m K9. Gaat de app naar anderen: K4, K5 en F8 samen als release-straat, vóór S5 en F9.
-6. **Features, gekozen door Daniel (oktober 2026):** ~~F2~~ (gedaan), dan F1, F4 en F3, elk als eigen PR. Daarna F10, dat de meeste waarde heeft voor dagelijks gebruik (eerst beslissing 7); de rest op aanvraag.
+6. **Volgende stappen, gekozen door Daniel (oktober 2026):** ~~F2~~, ~~S4~~ (gedaan), dan F5, F7 en F3, elk als eigen PR. F1 en F4 op aanvraag; F10 vervallen. Leidraad: onderhoud en een sterke verkoop-PDF gaan voor dagelijks bijhouden.
 
 ## Open beslissingen voor Daniel
 1. ~~Wordt de GitHub-repo openbaar?~~ Ja, de repo is openbaar. Nog open: gaat de app actief naar anderen? Dat bepaalt S5, F8 en F9.
 2. ~~P1: DPAPI of een eigen wachtwoord?~~ Besloten: DPAPI voor de gegevens op deze pc (P1), een wachtwoord op de back-up (P2), zodat terugzetten op een andere pc kan. Uitwerken in K6.
 3. P3: na verkoop alles wissen of een geanonimiseerd archief bewaren?
-4. ~~Welke features hebben de voorkeur?~~ Besloten: F2, F1, F4 en F3, in die volgorde (zie Voorgestelde volgorde, stap 6).
+4. ~~Welke features hebben de voorkeur?~~ Besloten: F2 en S4 (gedaan), F5, F7 en F3, in die volgorde (zie Voorgestelde volgorde, stap 6).
 5. Blijft Python 3.15 de basis? Het ecosysteem loopt nog achter (zie pyyaml, Dependabot), maar `lazy import` hangt ervan af.
 6. In welke taal schrijven we commitberichten: Engels (past bij de code) of Nederlands?
-7. F10: importmap (eenvoudig, origineel kort in de cloud) of koppelen via het lokale netwerk (privacyvriendelijker, server luistert tijdelijk breder)?
+7. ~~F10: importmap of koppelen via het lokale netwerk?~~ Vervallen met F10.

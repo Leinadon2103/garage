@@ -11,5 +11,5 @@ if not exist .venv (
 )
 echo Checking packages...
 .venv\Scripts\python -m pip install -q -r requirements.txt
-start "" http://127.0.0.1:8000
-.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+rem opens the browser itself: only it knows the session token of this start (S4)
+.venv\Scripts\python tools\run_dev.py

@@ -14,6 +14,7 @@ Status: gebouwd (bouwstap 1 t/m 4, zie "Volgorde van bouwen"). Beslissing van Da
 |---|---|
 | Iemand met toegang tot je OneDrive (account overgenomen, gedeelde map, Microsoft zelf) | Ziet alleen versleutelde bestanden en back-ups |
 | Andere Windows-gebruiker op dezelfde pc, losse schijf, gestolen laptop zonder BitLocker | Kan bestanden niet lezen: de sleutel hoort bij jouw Windows-account |
+| Andere Windows-gebruiker op dezelfde pc, terwijl Garage bij jou openstaat | Kan de server op `127.0.0.1` wel bereiken, maar krijgt niets: zonder sessiecookie weigert de server alles (S4). Het token is bij elke start nieuw (32 willekeurige bytes) en alleen het venster van Garage krijgt het, via de start-URL; het cookie is `HttpOnly` en `SameSite=Strict` en verdwijnt bij het sluiten. |
 | Oude versies en prullenbak in OneDrive na verwijderen | Onleesbaar zodra de bestandssleutel uit de database is gewist (P9 zorgt dat die echt weg is) |
 | Malware of iemand die als jou is ingelogd | **Niet afgedekt.** Die kan de sleutel via DPAPI opvragen, net als Garage zelf. Daar helpt alleen een wachtwoord bij elke start, en dat is bewust niet gekozen. |
 | Oude back-ups na verkoop of wissen | **Niet afgedekt door P1/P2:** een back-up bevat de sleutels. Dat lost P3/P7 op (oude back-ups opruimen). |
