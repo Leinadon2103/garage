@@ -19,7 +19,7 @@ The installed program stores everything in **Documents\Garage**: the database (`
 Which data Garage stores and what goes outside is in [PRIVACY.md](PRIVACY.md) and in the app under *Instellingen > Privacy*.
 
 ## Developing and building
-- `start.bat` starts the app in your browser, with the data in `data\` of this project folder and its backups in `build\test-backups\` (`GARAGE_BACKUPS`), never between the real backups.
+- `start.bat` starts the app in your browser (through `tools/run_dev.py`, which passes the session token: a plain link to `127.0.0.1:8000` does not work), with the data in `data\` of this project folder and its backups in `build\test-backups\` (`GARAGE_BACKUPS`), never between the real backups.
 - `.venv\Scripts\pythonw.exe Garage.pyw` starts it in its own window, also with the data in `data\`. The environment variable `GARAGE_DATA` points to another data folder.
 - **Packages** are pinned with versions and hashes in `requirements.txt` (app and tests) and `requirements-build.txt` (PyInstaller, pip-audit). Change `requirements.in` or `requirements-build.in` and regenerate with Python 3.14 (Dependabot does not know 3.15 yet; the versions are the same):
   ```

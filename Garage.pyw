@@ -149,8 +149,9 @@ def starts_dark(theme: str) -> bool:
 class Api:
     """Functions the pages can call through window.pywebview.api."""
 
-    def __init__(self, base_url: str, dark: bool = False):
+    def __init__(self, base_url: str, dark: bool = False, session: str = ""):
         self.base_url = base_url
+        self.session = session  # "name=value" of the session cookie (S4), for requests outside the window
         self.hwnd = None
         self._colors = BAR_DARK if dark else BAR_LIGHT
         self._lock = threading.Lock()
@@ -190,7 +191,8 @@ class Api:
             return None  # cancelled
         target = Path(choice if isinstance(choice, str) else choice[0])
         # bandit B310 is fine here: always http://127.0.0.1 + a path checked above
-        with urllib.request.urlopen(self.base_url + path, timeout=120) as r:  # nosec B310
+        request = urllib.request.Request(self.base_url + path, headers={"Cookie": self.session})
+        with urllib.request.urlopen(request, timeout=120) as r:  # nosec B310
             target.write_bytes(r.read())
         return str(target)
 
@@ -309,7 +311,10 @@ def _self_test_steps(base: str, oil: int, lines: list[str]) -> None:
     invoices = [("invoices", ("factuur.pdf", pdf.tobytes(), "application/pdf")),
                 ("invoices", ("factuur.jpg", jpg, "image/jpeg"))]
 
+    from app.main import start_url
     with httpx.Client(base_url=base, timeout=120) as c:
+        step("without session: refused (S4)", c.get("/"), 403)
+        step("start the session, like the window does", c.get(start_url(base)), 303)
         for path in ("/health", "/", "/settings", "/vehicles/new", "/static/app.css"):
             step(f"GET {path}", c.get(path))
         v = step("add vehicle", c.post("/vehicles", data={
@@ -353,9 +358,10 @@ def main() -> None:
         server, thread = start_server(free_port())
         with db.connect() as conn:
             dark = starts_dark(db.setting(conn, "theme", "system"))
+        from app.main import SESSION_COOKIE, SESSION_TOKEN, start_url
         base = f"http://127.0.0.1:{server.config.port}"
-        api = Api(base, dark)
-        window = webview.create_window(TITLE, base, js_api=api, width=1280, height=860, min_size=(420, 600),
+        api = Api(base, dark, f"{SESSION_COOKIE}={SESSION_TOKEN}")
+        window = webview.create_window(TITLE, start_url(base), js_api=api, width=1280, height=860, min_size=(420, 600),
                                        background_color="#0e1014" if dark else "#f5f6f8", text_select=True)
 
         def on_shown():

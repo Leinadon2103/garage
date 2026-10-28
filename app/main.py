@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import secrets
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -57,6 +58,30 @@ async def key_present(request: Request, call_next):
     return await call_next(request)
 
 
+# S4: only the window that Garage itself opened may use the server. Other Windows users on this pc can reach
+# 127.0.0.1 as well, and the server hands out decrypted invoices: P1 protects the disk, not the running app.
+SESSION_TOKEN = secrets.token_urlsafe(32)  # new at every start; only the starter knows it (start URL)
+SESSION_COOKIE = "garage_session"
+OPEN = ("/start", "/health", "/favicon.ico", "/static/")  # works without the session: nothing personal there
+
+
+def start_url(base: str) -> str:
+    """The first page the window opens: it hands the window its session cookie."""
+    return f"{base}/start?token={SESSION_TOKEN}"
+
+
+def _same(given: str, expected: str) -> bool:
+    return secrets.compare_digest(given.encode(), expected.encode())  # bytes: any input, constant time
+
+
+@app.middleware("http")  # between key_present and own_app_only: after the host and CSRF checks
+async def own_session_only(request: Request, call_next):
+    if not request.url.path.startswith(OPEN) and not _same(request.cookies.get(SESSION_COOKIE, ""), SESSION_TOKEN):
+        return render(request, "error.html", status_code=403,
+                      error="Open Garage via de snelkoppeling of het startmenu. Dit adres werkt alleen in het venster van Garage zelf.")
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def own_app_only(request: Request, call_next):
     """Protection against other websites in your normal browser while Garage is running:
@@ -110,6 +135,15 @@ async def security_headers(request: Request, call_next):
 def health():
     """For the app starter: is the server running yet?"""
     return {"app": "garage"}
+
+
+@app.get("/start", include_in_schema=False)
+def start(token: str = ""):
+    if not _same(token, SESSION_TOKEN):
+        raise HTTPException(403, "Deze link is verlopen. Open Garage via de snelkoppeling of het startmenu.")
+    response = redirect("/")  # the token leaves the address bar straight away
+    response.set_cookie(SESSION_COOKIE, SESSION_TOKEN, httponly=True, samesite="strict", path="/")
+    return response
 
 
 @app.get("/recover")

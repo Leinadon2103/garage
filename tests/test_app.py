@@ -9,7 +9,7 @@ from pypdf import PdfReader
 from reportlab.pdfgen import canvas
 
 from app import db, planning, rdw
-from app.main import app
+from app.main import app, start_url
 
 PNG = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
        b"\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\xc9\xfe\x92\xef\x00\x00\x00\x00IEND\xaeB`\x82")
@@ -42,6 +42,7 @@ def client(tmp_path, monkeypatch):
     with TestClient(app) as c:
         # db.DATA_DIR is global: the startup backup must not run on into the next test's folder
         app.state.backup_thread.join()
+        c.get(start_url("http://testserver"))  # the session cookie (S4), like the window gets it
         yield c
 
 

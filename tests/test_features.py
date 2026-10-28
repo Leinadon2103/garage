@@ -332,13 +332,15 @@ def test_starter_save_pdf(monkeypatch, tmp_path):
     server, thread = garage.start_server(port)
     try:
         import httpx
-        r = httpx.post(f"http://127.0.0.1:{port}/vehicles", data={"license_plate": "AB12CD", "vehicle_type": "Motorfiets"})
+        from app.main import SESSION_COOKIE, SESSION_TOKEN
+        r = httpx.post(f"http://127.0.0.1:{port}/vehicles", data={"license_plate": "AB12CD", "vehicle_type": "Motorfiets"},
+                       cookies={SESSION_COOKIE: SESSION_TOKEN})
         vid = r.headers["location"].rsplit("/", 1)[1]
         target = tmp_path / "printout.pdf"
         chosen = []
         fake_window = types.SimpleNamespace(create_file_dialog=lambda *a, **k: chosen.append(k) or (str(target),))
         monkeypatch.setattr(webview, "windows", [fake_window])
-        api = garage.Api(f"http://127.0.0.1:{port}")
+        api = garage.Api(f"http://127.0.0.1:{port}", session=f"{SESSION_COOKIE}={SESSION_TOKEN}")
         assert api.save(f"/vehicles/{vid}/export.pdf?costs=0&costs=1", "x.pdf") == str(target)
         assert "AB12CD" in PdfReader(target).pages[0].extract_text()
         assert chosen[0]["save_filename"] == "x.pdf"

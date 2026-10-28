@@ -19,7 +19,7 @@ Het geïnstalleerde programma bewaart alles in **Documenten\Garage**: de databas
 Welke gegevens Garage bewaart en wat er naar buiten gaat, staat in [PRIVACY.nl.md](PRIVACY.nl.md) en in de app bij *Instellingen > Privacy*.
 
 ## Ontwikkelen en bouwen
-- `start.bat` start de app in je browser, met de gegevens in `data\` van deze projectmap en de back-ups daarvan in `build\test-backups\` (`GARAGE_BACKUPS`), nooit tussen de echte back-ups.
+- `start.bat` start de app in je browser (via `tools/run_dev.py`, dat het sessietoken meegeeft: een gewone link naar `127.0.0.1:8000` werkt niet), met de gegevens in `data\` van deze projectmap en de back-ups daarvan in `build\test-backups\` (`GARAGE_BACKUPS`), nooit tussen de echte back-ups.
 - Met `.venv\Scripts\pythonw.exe Garage.pyw` start je hem in een eigen venster, ook met de gegevens in `data\`. De omgevingsvariabele `GARAGE_DATA` wijst naar een andere gegevensmap.
 - **Pakketten** staan met vaste versies en hashes in `requirements.txt` (app en tests) en `requirements-build.txt` (PyInstaller, pip-audit). Pas `requirements.in` of `requirements-build.in` aan en genereer daarna opnieuw met Python 3.14 (Dependabot kent 3.15 nog niet; de versies zijn gelijk):
   ```

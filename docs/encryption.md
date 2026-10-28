@@ -14,6 +14,7 @@ Status: built (build steps 1 to 4, see "Build order"). Daniel's decision (Octobe
 |---|---|
 | Someone with access to your OneDrive (account taken over, shared folder, Microsoft itself) | Sees only encrypted files and backups |
 | Another Windows user on the same pc, a loose disk, a stolen laptop without BitLocker | Cannot read the files: the key belongs to your Windows account |
+| Another Windows user on the same pc, while Garage is open for you | Can reach the server on `127.0.0.1`, but gets nothing: without the session cookie the server refuses everything (S4). The token is new at every start (32 random bytes) and only Garage's window gets it, through the start URL; the cookie is `HttpOnly` and `SameSite=Strict` and is gone when Garage closes. |
 | Old versions and recycle bin in OneDrive after deleting | Unreadable once the file key is erased from the database (P9 makes sure it is really gone) |
 | Malware or someone logged in as you | **Not covered.** They can ask DPAPI for the key, just like Garage. Only a password at every start helps there, and that was deliberately not chosen. |
 | Old backups after a sale or wipe | **Not covered by P1/P2:** a backup contains the keys. P3/P7 solve that (cleaning up old backups). |
