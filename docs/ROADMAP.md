@@ -19,7 +19,7 @@ Status: October 2026, after version 1.3.0. This document is the handover to a ne
 - Redaction is real (`apply_redactions` + `scrub`). An unreviewed invoice never ends up in the sale PDF. EXIF is removed from photos.
 - A privacy overview in the app and in `PRIVACY.md`. Sketchfab only loads after a click.
 - Packages are pinned with hashes, with pip-audit, bandit and Dependabot (also for the GitHub Actions). License AGPL-3.0, with `LICENSES.md`.
-- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10, G9 and K3, and the conversion to English code (migration 2). Then encryption of files, sensitive fields and backups with recovery through the backup password (P1, P2, P8; [encryption.md](encryption.md)) and fill-ups with fuel consumption (F2). Schema version 4. CI runs on GitHub; the repo is public and `main` is protected (see Working agreements).
+- **Built after 1.3.0:** step 1 (S2, S3, G1, G2, G3), P9, P10, G9 and K3, and the conversion to English code (migration 2). Then encryption of files, sensitive fields and backups with recovery through the backup password (P1, P2, P8; [encryption.md](encryption.md)) and fill-ups with fuel consumption (F2). Schema version 4. Then total cost of ownership (F5), version 1.4.0, and a design round over the whole app: motion that explains (`static/app.js`, lists in reading order, growing bars, counting numbers; off with "reduce motion" in Windows) and fixes from a walkthrough as a user. CI runs on GitHub; the repo is public and `main` is protected (see Working agreements).
 
 ## Legal framework (estimate, not legal advice)
 - For personal use, Garage falls under the **household exemption** (Art. 2(2)(c) GDPR).

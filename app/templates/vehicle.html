@@ -61,15 +61,15 @@
 {% set total = services|selectattr("cost")|sum(attribute="cost") %}
 <div class="stats">
   <div class="card stat"><div class="icon">{{ icon("gauge") }}</div><div style="flex:1"><small>Km-stand</small>
-    {% if current_km is not none %}<strong>{{ current_km|km }}</strong>
+    {% if current_km is not none %}<strong data-count="{{ current_km }}" data-format="int">{{ current_km|km }}</strong>
     {% elif km_estimate is not none %}<strong title="Ruwe schatting: leeftijd × landelijk gemiddelde. Noteer hieronder de echte km-stand.">± {{ km_estimate|km }}</strong><small>ruwe schatting</small>
     {% else %}<strong>–</strong>{% endif %}
     <form method="post" action="/vehicles/{{ v.id }}/odometer" class="km-quick">
       <input type="number" name="odometer_km" min="0" placeholder="{{ (current_km|km) if current_km else 'Km nu' }}" aria-label="Huidige kilometerstand" required>
       <button class="btn ghost small" title="Km-stand van vandaag noteren">{{ icon("check") }} Noteer</button>
     </form></div></div>
-  <div class="card stat"><div class="icon">{{ icon("wrench") }}</div><div><small>Onderhoudsbeurten</small><strong>{{ services|length }}</strong></div></div>
-  <a class="card stat" href="/vehicles/{{ v.id }}/costs" style="color:inherit"><div class="icon">{{ icon("receipt") }}</div><div><small>Totaal uitgegeven</small><strong>{{ total|euro if total else "–" }}</strong><small>Kosten &amp; km-verloop →</small></div></a>
+  <div class="card stat"><div class="icon">{{ icon("wrench") }}</div><div><small>Onderhoudsbeurten</small><strong data-count="{{ services|length }}" data-format="int">{{ services|length }}</strong></div></div>
+  <a class="card stat" href="/vehicles/{{ v.id }}/costs" style="color:inherit"><div class="icon">{{ icon("receipt") }}</div><div><small>Onderhoud</small>{% if total %}<strong data-count="{{ total }}">{{ total|euro }}</strong>{% else %}<strong>–</strong>{% endif %}<small>uitgegeven · kosten &amp; km →</small></div></a>
 </div>
 
 {% if km_saved %}<div class="notice ok" style="margin-top:16px">{{ icon("check") }}<p>Km-stand genoteerd. De planning is bijgewerkt.</p></div>{% endif %}
