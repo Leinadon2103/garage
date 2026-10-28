@@ -49,6 +49,7 @@ More: [docs/](docs/) has the [roadmap](docs/ROADMAP.md), the [data register](doc
 - **Automatic backup:** a zip file every week to OneDrive or a folder of your choice; restore through Settings. A safety copy is always made first.
 - **Reminders:** when signing in to Windows, a notification if maintenance, the APK or a document is due. At most one notification per day.
 - **Costs and odometer history**, **documents** (registration, policy; they never go into the export), **specs** (oil, tyres, chain) and **storage** with checklists.
+- **Parts and consumables** with brand and part number, linked to maintenance: you see what the next service needs, tick off what is in stock, and copy the shopping list.
 - **Theme:** light, dark or like Windows. Switching is smooth, and the title bar follows.
 
 ## About the odometer reading

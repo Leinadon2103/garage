@@ -261,7 +261,20 @@ def _migration_5(conn: sqlite3.Connection) -> None:
         kind TEXT NOT NULL, label TEXT, amount_per_year REAL NOT NULL, start_date TEXT NOT NULL, end_date TEXT)""")
 
 
-MIGRATIONS = [_migration_1, _migration_2, _migration_3, _migration_4, _migration_5]
+def _migration_6(conn: sqlite3.Connection) -> None:
+    """Parts and consumables (F7): what a vehicle needs, with part numbers, and for which maintenance."""
+    conn.execute("""CREATE TABLE part (
+        id INTEGER PRIMARY KEY,
+        vehicle_id INTEGER NOT NULL REFERENCES vehicle(id) ON DELETE CASCADE,
+        name TEXT NOT NULL, brand TEXT, part_number TEXT, quantity TEXT, note TEXT,
+        in_stock INTEGER NOT NULL DEFAULT 0)""")
+    conn.execute("""CREATE TABLE part_maintenance_type (
+        part_id INTEGER NOT NULL REFERENCES part(id) ON DELETE CASCADE,
+        type_id INTEGER NOT NULL REFERENCES maintenance_type(id) ON DELETE CASCADE,
+        PRIMARY KEY (part_id, type_id))""")
+
+
+MIGRATIONS = [_migration_1, _migration_2, _migration_3, _migration_4, _migration_5, _migration_6]
 SCHEMA_VERSION = len(MIGRATIONS)
 
 

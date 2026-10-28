@@ -49,6 +49,7 @@ Verder: in [docs/](docs/) staan de [roadmap](docs/ROADMAP.nl.md), het [gegevensr
 - **Automatische back-up:** elke week een zip-bestand naar OneDrive of een eigen map; terugzetten via Instellingen. Er wordt altijd eerst een veiligheidskopie gemaakt.
 - **Herinneringen:** bij het aanmelden in Windows een melding als er onderhoud, APK of een document verloopt. Hooguit één melding per dag.
 - **Kosten en km-verloop**, **documenten** (kentekenbewijs, polis; die gaan nooit mee in de export), **specificaties** (olie, banden, ketting) en **stalling** met checklists.
+- **Onderdelen en verbruiksmaterialen** met merk en artikelnummer, gekoppeld aan onderhoud: je ziet wat de volgende beurt nodig heeft, vinkt af wat op voorraad is en kopieert de kooplijst.
 - **Weergave:** licht, donker of zoals Windows. Het wisselen gaat vloeiend, en de titelbalk kleurt mee.
 
 ## Over de kilometerstand

@@ -22,7 +22,7 @@
 
   <div class="field">
     <span class="field-header">Wat is er gedaan?</span>
-    <details class="dropdown" id="types-dropdown">
+    <details class="dropdown" id="types-dropdown" data-placeholder="Kies onderhoud…">
       <summary><span class="placeholder">Kies onderhoud…</span></summary>
       <div class="panel">
         <input type="search" placeholder="Zoeken…" aria-label="Onderhoud zoeken">
@@ -79,22 +79,8 @@
 {% endif %}
 
 <script>
-  // Multi-select: chosen maintenance as chips in the dropdown header, with a search field
+  // the maintenance dropdown itself works through static/app.js
   const dd = document.getElementById("types-dropdown");
-  const header = dd.querySelector("summary");
-  const update = () => {
-    const names = [...dd.querySelectorAll("input[type=checkbox]:checked")].map(i => i.parentElement.textContent.trim());
-    header.replaceChildren(...(names.length
-      ? names.map(n => Object.assign(document.createElement("span"), {className: "chip accent", textContent: n}))
-      : [Object.assign(document.createElement("span"), {className: "placeholder", textContent: "Kies onderhoud…"})]));
-  };
-  dd.addEventListener("change", update);
-  dd.querySelector("input[type=search]").addEventListener("input", e => {
-    const q = e.target.value.toLowerCase();
-    dd.querySelectorAll("li").forEach(li => li.hidden = !li.textContent.toLowerCase().includes(q));
-  });
-  document.addEventListener("click", e => { if (!dd.contains(e.target)) dd.open = false; });
-  update();
 
   // Upload box: show file names and support dragging
   const box = document.getElementById("upload"), input = box.querySelector("input"), text = document.getElementById("upload-text");
@@ -140,7 +126,7 @@
     dd.querySelectorAll("input[type=checkbox]").forEach(c => {
       if (r.types.includes(+c.value) && !c.checked) { c.checked = true; added.push(c.parentElement.textContent.trim()); }
     });
-    update();
+    dd.dispatchEvent(new Event("change"));
     if (added.length) parts.push(added.join(" + "));
     notice.querySelector("p").textContent = parts.length
       ? "Ingevuld uit je factuur: " + parts.join(" · ") + ". Controleer het even."

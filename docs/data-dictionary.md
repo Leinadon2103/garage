@@ -4,7 +4,7 @@
 
 Meaning of every table and column in `onderhoud.db`, with allowed values and origin. Where data is stored and how sensitive it is, is in the [data register](data-register.md). Dutch terms and their English names: [glossary](glossary.md).
 
-Status: schema version 5 (`PRAGMA user_version`). The test `tests/test_data_dictionary.py` fails if a column in the database is missing here (in both languages); so with a new migration, add the columns here too.
+Status: schema version 6 (`PRAGMA user_version`). The test `tests/test_data_dictionary.py` fails if a column in the database is missing here (in both languages); so with a new migration, add the columns here too.
 
 ## Conventions
 - **Names** in the database are English (since migration 2). **Values** the user sees stay Dutch: vehicle types (from the RDW), document kinds, names of maintenance types and specs.
@@ -160,6 +160,28 @@ Fixed cost per year (F5): insurance, road tax or something else (storage, roadsi
 | `start_date` | TEXT, required | Applies from | ISO date | manual |
 | `end_date` | TEXT | Applies up to and including | ISO date ≥ `start_date`, or NULL (ongoing) | manual |
 
+### part
+Part or consumable of a vehicle (F7), such as oil or a filter. Linked to maintenance through `part_maintenance_type`; `parts.needed` then shows which parts the next service needs.
+
+| Column | Type | Meaning | Allowed values | Origin |
+|---|---|---|---|---|
+| `id` | INTEGER | Key | | automatic |
+| `vehicle_id` | INTEGER, required | Vehicle | existing `vehicle.id` | app |
+| `name` | TEXT, required | What it is | free, max. 80 characters (e.g. Oliefilter) | manual |
+| `brand` | TEXT | Brand | free, max. 60 characters | manual |
+| `part_number` | TEXT | Part number | free, max. 60 characters | manual |
+| `quantity` | TEXT | Quantity per service | free, max. 40 characters (e.g. 3,2 liter) | manual |
+| `note` | TEXT | Note | free, max. 200 characters | manual |
+| `in_stock` | INTEGER, required | In stock | 0 = still to buy, 1 = in stock | manual |
+
+### part_maintenance_type
+For which maintenance a part is needed (many-to-many).
+
+| Column | Type | Meaning | Allowed values | Origin |
+|---|---|---|---|---|
+| `part_id` | INTEGER, required | Part | existing `part.id` | app |
+| `type_id` | INTEGER, required | Maintenance | existing `maintenance_type.id` that applies to the vehicle type | manual |
+
 ### storage_period
 Period in which the vehicle is stored (e.g. winter storage). No reminders are sent during storage.
 
@@ -245,5 +267,6 @@ Sources: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) and *Br
 | 3 | `db._migration_3` | Table `file_key` for encryption (P1). The existing files and fields are encrypted by `db.encrypt_existing()` at startup, not by the migration. |
 | 4 | `db._migration_4` | Table `fuel_entry` for fill-ups and fuel consumption (F2). |
 | 5 | `db._migration_5` | Total cost of ownership (F5): purchase and value in `vehicle`, table `fixed_cost`. |
+| 6 | `db._migration_6` | Parts and consumables (F7): tables `part` and `part_maintenance_type`. |
 
 A new migration goes at the end of `db.MIGRATIONS` and gets a row here. Data of a newer version than the app knows is not opened and not restored.
