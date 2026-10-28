@@ -4,7 +4,7 @@
 
 Meaning of every table and column in `onderhoud.db`, with allowed values and origin. Where data is stored and how sensitive it is, is in the [data register](data-register.md). Dutch terms and their English names: [glossary](glossary.md).
 
-Status: schema version 4 (`PRAGMA user_version`). The test `tests/test_data_dictionary.py` fails if a column in the database is missing here (in both languages); so with a new migration, add the columns here too.
+Status: schema version 5 (`PRAGMA user_version`). The test `tests/test_data_dictionary.py` fails if a column in the database is missing here (in both languages); so with a new migration, add the columns here too.
 
 ## Conventions
 - **Names** in the database are English (since migration 2). **Values** the user sees stay Dutch: vehicle types (from the RDW), document kinds, names of maintenance types and specs.
@@ -41,6 +41,9 @@ One row per vehicle.
 | `schedule_source` | TEXT | Where the custom maintenance intervals come from | free or NULL (e.g. "instructieboekje") | manual |
 | `rdw_json` | TEXT | Extra RDW data as JSON, see [rdw_json](#rdw_json) | JSON object or NULL | RDW, filtered by `main._rdw_extra` |
 | `rdw_updated_on` | TEXT | Date of the last RDW lookup | ISO date or NULL | app |
+| `purchase_price` | REAL | Purchase price in euros (F5) | ≥ 0 or NULL | manual |
+| `purchase_date` | TEXT | Purchase date; start of the depreciation | ISO date, not in the future, or NULL | manual |
+| `current_value` | REAL | Own estimate of the value now; NULL = rule of thumb of 15% value loss per year | ≥ 0 or NULL | manual |
 
 ### maintenance_type
 Kinds of maintenance, with a default interval (the "rule of thumb"). With an empty table, `db.init()` fills in `DEFAULT_TYPES`.
@@ -144,6 +147,19 @@ Fill-up (F2). Counts in the odometer history; `fuel.consumption` works out the c
 | `full_tank` | INTEGER, required | Filled up completely | 1 (default) or 0; with 0 the litres count at the next full tank | manual |
 | `note` | TEXT | Note, e.g. the petrol station | free or NULL | manual |
 
+### fixed_cost
+Fixed cost per year (F5): insurance, road tax or something else (storage, roadside assistance). A new amount of the same cost (same kind and label) replaces the previous one from its start date; `ownership.calculate` spreads everything over the calendar days.
+
+| Column | Type | Meaning | Allowed values | Origin |
+|---|---|---|---|---|
+| `id` | INTEGER | Key | | automatic |
+| `vehicle_id` | INTEGER, required | Vehicle | existing `vehicle.id` | app |
+| `kind` | TEXT, required | Kind | `insurance`, `road_tax`, `other` | manual |
+| `label` | TEXT | Description | free, max. 60 characters; required with `other` | manual |
+| `amount_per_year` | REAL, required | Amount per year in euros | > 0; entered per month, quarter or year | manual |
+| `start_date` | TEXT, required | Applies from | ISO date | manual |
+| `end_date` | TEXT | Applies up to and including | ISO date ≥ `start_date`, or NULL (ongoing) | manual |
+
 ### storage_period
 Period in which the vehicle is stored (e.g. winter storage). No reminders are sent during storage.
 
@@ -228,5 +244,6 @@ Sources: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) and *Br
 | 2 | `db._migration_2` | English names for tables, columns, setting keys and internal values (`RENAMES_2` and related). Values the user sees stay Dutch. |
 | 3 | `db._migration_3` | Table `file_key` for encryption (P1). The existing files and fields are encrypted by `db.encrypt_existing()` at startup, not by the migration. |
 | 4 | `db._migration_4` | Table `fuel_entry` for fill-ups and fuel consumption (F2). |
+| 5 | `db._migration_5` | Total cost of ownership (F5): purchase and value in `vehicle`, table `fixed_cost`. |
 
 A new migration goes at the end of `db.MIGRATIONS` and gets a row here. Data of a newer version than the app knows is not opened and not restored.

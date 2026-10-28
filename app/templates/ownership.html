@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Kosten van bezit{% endblock %}
+{% set kind_names = {"insurance": "Verzekering", "road_tax": "Wegenbelasting", "other": "Overig"} %}
+{% macro money(x) %}{{ x|euro|replace(",00", "") if x >= 100 else x|euro }}{% endmacro %}
+{% macro pct(x) %}{{ (x * 100)|round|int }}%{% endmacro %}
+{% block content %}
+<div class="tco">
+<a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
+<div class="header"><div><div class="eyebrow">{{ v.license_plate|plate }}</div><h1>Kosten van bezit</h1>
+  <p class="muted">Wat dit voertuig je echt kost: afschrijving, onderhoud, brandstof, verzekering, wegenbelasting en overige vaste lasten,
+    eerlijk verdeeld over de dagen dat hij van jou is. Alleen voor jou: dit komt niet in de verkoop-PDF.</p></div></div>
+
+{% if saved == "purchase" %}<div class="notice ok pop">{{ icon("check") }}<p>Aankoop en waarde opgeslagen.</p></div>
+{% elif saved == "fixed" %}<div class="notice ok pop">{{ icon("check") }}<p>Vaste last toegevoegd.</p></div>{% endif %}
+
+{% if f.total > 0 %}
+{# ----- 1. the headline: what does it cost me per month ----- #}
+<section class="card tco-hero" data-reveal aria-label="Samenvatting">
+  <div class="tco-hero-main">
+    <small class="muted">Kost je gemiddeld</small>
+    {% if f.per_month %}
+    <strong class="tco-big"><span data-count="{{ f.per_month }}">{{ f.per_month|euro }}</span><span class="tco-unit"> per maand</span></strong>
+    <small class="muted">sinds {{ f.since|short_date }} · ongeveer {{ (f.per_month * 12 / 365)|euro }} per dag</small>
+    {% else %}
+    <strong class="tco-big">–</strong><small class="muted">Na een maand rekent Garage een gemiddelde per maand uit.</small>
+    {% endif %}
+  </div>
+  <dl class="tco-facts">
+    <div><dt>Totaal tot nu toe</dt><dd data-count="{{ f.total }}">{{ f.total|euro }}</dd></div>
+    <div><dt>Per jaar</dt><dd>{% if f.per_month %}<span data-count="{{ f.per_month * 12 }}">{{ (f.per_month * 12)|euro }}</span>{% else %}–{% endif %}</dd></div>
+    <div><dt>Per km</dt><dd>{% if f.per_km %}<span data-count="{{ f.per_km }}" data-digits="{{ 3 if f.per_km < 0.1 else 2 }}">€ {{ ("%.3f" if f.per_km < 0.1 else "%.2f")|format(f.per_km)|replace(".", ",") }}</span>{% else %}<span class="muted" title="Noteer km-standen om dit te zien">–</span>{% endif %}</dd></div>
+  </dl>
+</section>
+
+{# ----- 2. composition: where does the money go ----- #}
+<section class="section" data-reveal>
+  <h2>{{ icon("chart-column") }} Waar het geld heen gaat</h2>
+  <div class="card">
+    <div class="share-bar" role="img" aria-label="Verdeling van de kosten: {% for c in categories if f.totals[c] > 0.005 %}{{ categories[c] }} {{ pct(f.totals[c] / f.total) }}{{ ", " if not loop.last }}{% endfor %}">
+      {% for c in categories if f.totals[c] > 0.005 %}
+      <span class="seg share-seg cat-{{ c }}" style="--v: {{ f.totals[c] / f.total }}; --i: {{ loop.index0 }}"
+            data-tip="{{ categories[c] }}: {{ f.totals[c]|euro }} ({{ pct(f.totals[c] / f.total) }})"></span>
+      {% endfor %}
+    </div>
+    <ul class="tco-legend">
+      {% for c in categories if f.totals[c] > 0.005 %}
+      <li class="legend-item cat-{{ c }}" tabindex="0">
+        <span class="swatch" aria-hidden="true"></span>
+        <span class="name">{{ categories[c] }}</span>
+        <span class="share muted">{{ pct(f.totals[c] / f.total) }}</span>
+        <strong data-count="{{ f.totals[c] }}">{{ f.totals[c]|euro }}</strong>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if f.value_gain > 0 %}
+    <p class="notice ok" style="margin:16px 0 0">{{ icon("sparkles") }} <span>Je voertuig is {{ f.value_gain|euro }} méér waard dan je ervoor betaalde. Die waardestijging staat hier niet als min-kosten: het blijft een schatting tot je verkoopt.</span></p>
+    {% endif %}
+  </div>
+</section>
+
+{# ----- 3. change over time: per calendar year, stacked ----- #}
+<section class="section" data-reveal>
+  <h2>{{ icon("calendar") }} Per jaar</h2>
+  <div class="card">
+    {% set n = f.years|length %}
+    {% set slot = 928 / n %}
+    {% set width = [72, slot * 0.62]|min %}
+    <svg class="chart tco-chart" viewBox="0 0 1000 272" role="img"
+         aria-label="Kosten per jaar, gestapeld per soort. {% for y in f.years %}{{ y.year }}: {{ y.total|euro }}{{ '. ' if not loop.last }}{% endfor %}">
+      {% for t in [0, 0.5, 1] %}
+      <line class="gridline" x1="64" x2="992" y1="{{ 236 - t * 216 }}" y2="{{ 236 - t * 216 }}"/>
+      <text class="axis" x="56" y="{{ 240 - t * 216 }}" text-anchor="end">{{ money(top * t) }}</text>
+      {% endfor %}
+      <defs>{% for y in f.years %}{% set x = 64 + slot * (loop.index0 + 0.5) - width / 2 %}{% set h = y.total / top * 216 %}
+        <clipPath id="bar-{{ y.year }}"><path d="M{{ x }},236 V{{ 236 - h + 4 }} Q{{ x }},{{ 236 - h }} {{ x + 4 }},{{ 236 - h }} H{{ x + width - 4 }} Q{{ x + width }},{{ 236 - h }} {{ x + width }},{{ 236 - h + 4 }} V236 Z"/></clipPath>
+      {% endfor %}</defs>
+      {% for y in f.years %}
+      {% set x = 64 + slot * (loop.index0 + 0.5) - width / 2 %}
+      <g class="year-bar" tabindex="0" style="--i: {{ loop.index0 }}"
+         data-tip="{{ y.year }}: {{ y.total|euro }}{% for s in y.segments|reverse %} · {{ categories[s.cat] }} {{ s.amount|euro }}{% endfor %}">
+        <rect class="hit" x="{{ x - 8 }}" y="20" width="{{ width + 16 }}" height="216"/>
+        <g clip-path="url(#bar-{{ y.year }})">
+          {% for s in y.segments %}
+          <rect class="seg cat-{{ s.cat }}" x="{{ x }}" y="{{ 236 - s.to * 216 }}" width="{{ width }}" height="{{ (s.to - s.from) * 216 }}"/>
+          {% endfor %}
+        </g>
+      </g>
+      <text class="axis" x="{{ x + width / 2 }}" y="256" text-anchor="middle">{{ y.year }}</text>
+      {% if n <= 10 or loop.last %}
+      <text class="axis bar-total" x="{{ x + width / 2 }}" y="{{ 236 - y.total / top * 216 - 8 }}" text-anchor="middle" style="--i: {{ loop.index0 }}">{{ money(y.total) }}</text>
+      {% endif %}
+      {% endfor %}
+    </svg>
+    <p class="muted" style="font-size:.85rem;margin:8px 0 0">Wijs een jaar aan voor de verdeling. Wijs een soort aan in de legenda hierboven om die in beide grafieken te volgen.</p>
+    <details><summary class="muted" style="cursor:pointer;font-size:.9rem">Als tabel tonen</summary>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Jaar</th>{% for c in categories if f.totals[c] > 0.005 %}<th>{{ categories[c] }}</th>{% endfor %}<th>Totaal</th></tr></thead>
+        <tbody>{% for y in f.years|reverse %}<tr><td>{{ y.year }}</td>
+          {% for c in categories if f.totals[c] > 0.005 %}<td>{{ y.amounts[c]|euro if y.amounts[c] > 0.005 else "–" }}</td>{% endfor %}
+          <td><strong>{{ y.total|euro }}</strong></td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+  </div>
+</section>
+{% else %}
+<div class="card empty" data-reveal>
+  {{ icon("chart-column") }}
+  <h2>Nog geen kosten</h2>
+  <p class="muted">Vul hieronder de aankoop in en je vaste lasten (verzekering, wegenbelasting). Onderhoud en brandstof komen er vanzelf bij uit je beurten en tankbeurten.</p>
+</div>
+{% endif %}
+
+{# ----- 4. input ----- #}
+<div class="tco-forms">
+  <section class="card" id="purchase" data-reveal>
+    <h2>{{ icon("receipt") }} Aankoop en waarde</h2>
+    <form method="post" action="/vehicles/{{ v.id }}/purchase">
+      <div class="fields">
+        <div class="field"><label for="purchase-price">Aankoopprijs</label><input id="purchase-price" name="purchase_price" inputmode="decimal"
+          value="{{ v.purchase_price|euro|replace('€ ', '') if v.purchase_price is not none else '' }}" placeholder="bijv. 6.500"></div>
+        <div class="field"><label for="purchase-date">Gekocht op</label><input id="purchase-date" type="date" name="purchase_date" max="{{ today }}" value="{{ v.purchase_date or '' }}"></div>
+        <div class="field"><label for="current-value">Waarde nu (schatting)</label><input id="current-value" name="current_value" inputmode="decimal"
+          value="{{ v.current_value|euro|replace('€ ', '') if v.current_value is not none else '' }}"
+          placeholder="{{ ('± ' ~ (rule_of_thumb|round|int) ~ ' (vuistregel)') if rule_of_thumb else 'bijv. 5.000' }}"></div>
+      </div>
+      <p class="muted" style="font-size:.88rem;margin:0 0 14px">
+        {% if f.value_now is not none %}Garage rekent nu met <strong>{{ f.value_now|euro }}</strong>
+          {{ "(vuistregel: 15% waardeverlies per jaar)" if f.value_is_estimate else "(jouw schatting)" }}.{% endif %}
+        Laat "waarde nu" leeg voor de vuistregel, of kijk wat vergelijkbare voertuigen opbrengen op Marktplaats.</p>
+      <button class="btn">{{ icon("check") }} Opslaan</button>
+    </form>
+  </section>
+
+  <section class="card" id="fixed" data-reveal>
+    <h2>{{ icon("shield-check") }} Vaste lasten</h2>
+    {% if fixed %}
+    <ul class="fixed-list">
+      {% for x in fixed %}
+      <li class="cat-{{ x.kind }}">
+        <span class="swatch" aria-hidden="true"></span>
+        <span><span class="name">{{ x.label or kind_names[x.kind] }}</span><br>
+          <small class="muted">{{ x.amount_per_year|euro }} per jaar · {{ (x.amount_per_year / 12)|euro }} per maand ·
+            {% if x.end_date %}{{ x.start_date|short_date }} t/m {{ x.end_date|short_date }}{% else %}vanaf {{ x.start_date|short_date }}{% endif %}</small></span>
+        <form method="post" action="/fixed-costs/{{ x.id }}/delete" onsubmit="return confirm('Deze vaste last verwijderen?')">
+          <button class="link-button" aria-label="Verwijderen">{{ icon("trash-2") }}</button></form>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="muted" style="font-size:.85rem">Premie of belasting veranderd? Voeg het nieuwe bedrag toe met de datum waarop het ingaat: het oude bedrag stopt dan vanzelf.</p>
+    {% endif %}
+    <form method="post" action="/vehicles/{{ v.id }}/fixed-costs">
+      <div class="fields">
+        <div class="field"><label for="fixed-kind">Soort</label>
+          <select id="fixed-kind" name="kind">{% for k, name in kind_names.items() %}<option value="{{ k }}">{{ name }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="fixed-label">Omschrijving <span class="muted">(bij Overig)</span></label><input id="fixed-label" name="label" maxlength="60" placeholder="bijv. Stalling, Pechhulp"></div>
+        <div class="field"><label for="fixed-amount">Bedrag</label>
+          <div class="amount-per"><input id="fixed-amount" name="amount" inputmode="decimal" placeholder="bijv. 24,50" required>
+            <select name="per" aria-label="Per"><option value="month">per maand</option><option value="quarter">per kwartaal</option><option value="year">per jaar</option></select></div></div>
+        <div class="field"><label for="fixed-start">Geldt vanaf</label><input id="fixed-start" type="date" name="start_date" value="{{ v.purchase_date or today }}" required></div>
+        <div class="field"><label for="fixed-end">Tot en met <span class="muted">(optioneel)</span></label><input id="fixed-end" type="date" name="end_date"></div>
+      </div>
+      <button class="btn ghost">{{ icon("plus") }} Toevoegen</button>
+    </form>
+  </section>
+</div>
+</div>
+{% endblock %}

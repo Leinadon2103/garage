@@ -74,7 +74,7 @@ Done is ~~struck through~~.
 | ~~**F2**~~ | ~~Refuelling and consumption (l/100 km, km/l), cost per km including fuel~~ | A popular feature in maintenance apps; a more complete cost picture | done |
 | **F3** | APK history and defects from RDW Open Data, and details of recalls | More value in the sale PDF, without extra personal data | medium |
 | **F4** | Search and filter in the history (type, garage, period, amount) | Convenience with a long history | small |
-| **F5** | Total cost of ownership (TCO): depreciation, insurance, tax and maintenance per year | Insight | medium |
+| ~~**F5**~~ | ~~Total cost of ownership (TCO): depreciation, insurance, tax and maintenance per year~~ (also fuel and other fixed costs; page with animations, checked against the data visualisation guidelines) | Insight | done |
 | **F6** | Import the previous owner's history (their sale PDF as an attachment to the vehicle) | Continuous history; mind the previous owner's personal data (redaction) | medium |
 | **F7** | Parts and consumables (oil, filters) with part numbers; list "needed for the next service" | Practical for people who work on their own vehicle | medium |
 | **F8** | Notify about a new version through GitHub Releases, only with consent | Updates without telemetry | small |
@@ -102,13 +102,13 @@ Done is ~~struck through~~.
 3. **Trust for the buyer:** G4, G6, G7, and with it F3.
 4. **Finishing:** S1, P5, P7 with F11, ~~P8~~ (done, with P1), G5, G8, K1, K2.
 5. **Professionalisation, spread out:** K4 to K9. If the app goes to others: K4, K5 and F8 together as a release pipeline, before S5 and F9.
-6. **Next steps, chosen by Daniel (October 2026):** ~~F2~~, ~~S4~~ (done), then F5, F7 and F3, each as its own PR. F1 and F4 on request; F10 dropped. Guideline: maintenance and a strong sale PDF come before day-to-day tracking.
+6. **Next steps, chosen by Daniel (October 2026):** ~~F2~~, ~~S4~~, ~~F5~~ (done), then F7 and F3, each as its own PR. F1 and F4 on request; F10 dropped. Guideline: maintenance and a strong sale PDF come before day-to-day tracking.
 
 ## Open decisions for Daniel
 1. ~~Will the GitHub repo be public?~~ Yes, the repo is public. Still open: will the app be actively given to others? That decides S5, F8 and F9.
 2. ~~P1: DPAPI or an own password?~~ Decided: DPAPI for the data on this pc (P1), a password on the backup (P2), so a restore on another pc works. Worked out in K6.
 3. P3: after a sale erase everything or keep an anonymised archive?
-4. ~~Which features are preferred?~~ Decided: F2 and S4 (done), F5, F7 and F3, in that order (see Suggested order, step 6).
+4. ~~Which features are preferred?~~ Decided: F2, S4 and F5 (done), F7 and F3, in that order (see Suggested order, step 6).
 5. Does Python 3.15 remain the base? The ecosystem is still catching up (see pyyaml, Dependabot), but `lazy import` depends on it.
 6. Which language for commit messages: English (fits the code) or Dutch?
 7. ~~F10: import folder or pairing over the local network?~~ Dropped with F10.

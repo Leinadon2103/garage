@@ -280,6 +280,7 @@ def vehicle_detail(request: Request, vid: int):
                                     (vid,)).fetchone()
         sketchfab_autoload = db.setting(conn, "sketchfab_autoload", "off") == "on"
         fuel_average = fuel.consumption(extra.fuel_entries(conn, vid))["average"]
+        per_month = extra.ownership_figures(conn, v)[0]["per_month"]
     unreviewed = [f for s in services for f in s["invoices"] if not f["reviewed"]]
     info = _rdw_extra(v["rdw_json"])
     try:  # import: registered in the Netherlands well after the first registration (somewhere else)
@@ -288,7 +289,7 @@ def vehicle_detail(request: Request, vid: int):
     except (KeyError, TypeError, ValueError):
         imported = False
     return render(request, "vehicle.html", v=v, services=services, current_km=current_km,
-                  planning=plan, specs=specs, doc_count=doc_count, storage=storage, fuel_average=fuel_average,
+                  planning=plan, specs=specs, doc_count=doc_count, storage=storage, fuel_average=fuel_average, per_month=per_month,
                   last_reading=last_reading, today=date.today().isoformat(),
                   km_saved=request.query_params.get("km"),
                   unreviewed=unreviewed, rdw_info=info, custom_schedule=bool(intervals),

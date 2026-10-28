@@ -251,7 +251,17 @@ def _migration_4(conn: sqlite3.Connection) -> None:
         full_tank INTEGER NOT NULL DEFAULT 1, note TEXT)""")
 
 
-MIGRATIONS = [_migration_1, _migration_2, _migration_3, _migration_4]
+def _migration_5(conn: sqlite3.Connection) -> None:
+    """Total cost of ownership (F5): purchase and value of the vehicle, and fixed costs per year."""
+    for column in ("purchase_price REAL", "purchase_date TEXT", "current_value REAL"):
+        conn.execute(f"ALTER TABLE vehicle ADD COLUMN {column}")
+    conn.execute("""CREATE TABLE fixed_cost (
+        id INTEGER PRIMARY KEY,
+        vehicle_id INTEGER NOT NULL REFERENCES vehicle(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL, label TEXT, amount_per_year REAL NOT NULL, start_date TEXT NOT NULL, end_date TEXT)""")
+
+
+MIGRATIONS = [_migration_1, _migration_2, _migration_3, _migration_4, _migration_5]
 SCHEMA_VERSION = len(MIGRATIONS)
 
 

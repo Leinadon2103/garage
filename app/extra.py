@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from . import backup, crypto, db, fuel, planning
+from . import backup, crypto, db, fuel, ownership, planning
 from .web import (ALLOWED, delete_files, fetch, file_response, or_400, parse_amount, parse_int, read_uploads, redirect,
                   render)
 
@@ -155,6 +155,116 @@ def delete_fuel(fid: int):
         vid = fetch(conn, "fuel_entry", fid)["vehicle_id"]
         conn.execute("DELETE FROM fuel_entry WHERE id = ?", (fid,))
     return redirect(f"/vehicles/{vid}/fuel")
+
+
+# ---------- total cost of ownership (F5) ----------
+
+PER = {"month": 12, "quarter": 4, "year": 1}  # entered amount x this = amount per year
+
+
+def _iso(value) -> date | None:
+    try:
+        return date.fromisoformat(value) if value else None
+    except (TypeError, ValueError):
+        return None  # a broken date never breaks the page; it just does not count
+
+
+def _nice_ceiling(value: float) -> float:
+    """Top of the y-axis: the next 1, 2, 2.5 or 5 x 10^n, so the grid lines get round amounts."""
+    if value <= 0:
+        return 1
+    step = 10 ** (len(str(int(value))) - 1)
+    return next(m * step for m in (1, 2, 2.5, 5, 10) if m * step >= value)
+
+
+def ownership_figures(conn, v) -> tuple[dict, list[dict]]:
+    vid = v["id"]
+    fixed = [dict(f) for f in conn.execute(
+        "SELECT * FROM fixed_cost WHERE vehicle_id = ? ORDER BY CASE kind WHEN 'insurance' THEN 0 WHEN 'road_tax' THEN 1 "
+        "ELSE 2 END, label, start_date", (vid,))]  # same order as the legend
+    purchase = _iso(v["purchase_date"])
+    readings = [r["odometer_km"] for r in db.odometer_history(conn, vid)
+                if purchase is None or (_iso(r["date"]) or purchase) >= purchase]
+    paid = [{"date": _iso(r["date"]), "cost": r["cost"]} for r in conn.execute(
+        "SELECT date, cost FROM service WHERE vehicle_id = ?", (vid,))]
+    fuel_paid = [{"date": _iso(r["date"]), "cost": r["cost"]} for r in conn.execute(
+        "SELECT date, cost FROM fuel_entry WHERE vehicle_id = ?", (vid,))]
+    result = ownership.calculate(
+        v["purchase_price"], purchase, v["current_value"],
+        [{**f, "start_date": _iso(f["start_date"]), "end_date": _iso(f["end_date"])} for f in fixed if _iso(f["start_date"])],
+        [p for p in paid if p["date"]], [p for p in fuel_paid if p["date"]], date.today(),
+        max(readings) - min(readings) if len(readings) >= 2 else None)
+    return result, fixed
+
+
+@router.get("/vehicles/{vid}/ownership")
+def ownership_page(request: Request, vid: int, saved: str = ""):
+    with db.connect() as conn:
+        v = fetch(conn, "vehicle", vid)
+        figures, fixed = ownership_figures(conn, v)
+    top = _nice_ceiling(max((y["total"] for y in figures["years"]), default=0))
+    for y in figures["years"]:  # stacked segments from the baseline up, in the fixed category order
+        bottom, y["segments"] = 0.0, []
+        for cat in ownership.CATEGORIES:
+            if (amount := y["amounts"][cat]) > 0.005:
+                y["segments"].append({"cat": cat, "amount": amount, "from": bottom / top, "to": (bottom + amount) / top})
+                bottom += amount
+    rule_of_thumb = (ownership.estimated_value(v["purchase_price"], date.fromisoformat(v["purchase_date"]), date.today())
+                     if v["purchase_price"] and _iso(v["purchase_date"]) else None)
+    return render(request, "ownership.html", v=v, f=figures, fixed=fixed, top=top, saved=saved,
+                  categories=ownership.CATEGORIES, rule_of_thumb=rule_of_thumb, today=date.today().isoformat())
+
+
+def _amount(value: str, what: str = "Het bedrag") -> float | None:
+    amount = or_400(parse_amount, value)
+    if amount is not None and amount < 0:
+        raise HTTPException(400, f"{what} kan niet negatief zijn.")
+    if amount is not None and amount > 10_000_000:
+        raise HTTPException(400, f"{what} is onwaarschijnlijk hoog; klopt de invoer?")
+    return amount
+
+
+@router.post("/vehicles/{vid}/purchase")
+def save_purchase(vid: int, purchase_price: str = Form(""), purchase_date: str = Form(""),
+                  current_value: str = Form("")):
+    price, value = _amount(purchase_price, "De aankoopprijs"), _amount(current_value, "De waarde")
+    day = _not_in_future(_date(purchase_date)) if purchase_date else None
+    with db.connect() as conn:
+        fetch(conn, "vehicle", vid)
+        conn.execute("UPDATE vehicle SET purchase_price = ?, purchase_date = ?, current_value = ? WHERE id = ?",
+                     (price, day, value, vid))
+    return redirect(f"/vehicles/{vid}/ownership?saved=purchase#purchase")
+
+
+@router.post("/vehicles/{vid}/fixed-costs")
+def add_fixed_cost(vid: int, kind: str = Form(""), label: str = Form(""), amount: str = Form(""), per: str = Form("year"),
+                   start_date: str = Form(""), end_date: str = Form("")):
+    if kind not in ownership.FIXED_KINDS:
+        raise HTTPException(400, "Kies een soort kosten.")
+    if kind == "other" and not label.strip():
+        raise HTTPException(400, "Vul een omschrijving in, bijvoorbeeld 'Stalling' of 'Pechhulp'.")
+    if per not in PER:
+        raise HTTPException(400, "Kies per maand, per kwartaal of per jaar.")
+    value = _amount(amount)
+    if not value:
+        raise HTTPException(400, "Vul een bedrag in.")
+    start = _date(start_date or date.today().isoformat())
+    end = _date(end_date) if end_date else None
+    if end and end < start:
+        raise HTTPException(400, "De einddatum ligt voor de begindatum.")
+    with db.connect() as conn:
+        fetch(conn, "vehicle", vid)
+        conn.execute("INSERT INTO fixed_cost (vehicle_id, kind, label, amount_per_year, start_date, end_date)"
+                     " VALUES (?,?,?,?,?,?)", (vid, kind, label.strip()[:60] or None, value * PER[per], start, end))
+    return redirect(f"/vehicles/{vid}/ownership?saved=fixed#fixed")
+
+
+@router.post("/fixed-costs/{fid}/delete")
+def delete_fixed_cost(fid: int):
+    with db.connect() as conn:
+        vid = fetch(conn, "fixed_cost", fid)["vehicle_id"]
+        conn.execute("DELETE FROM fixed_cost WHERE id = ?", (fid,))
+    return redirect(f"/vehicles/{vid}/ownership#fixed")
 
 
 # ---------- cost and km overview ----------

@@ -7,6 +7,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/static/manifest.webmanifest">
   <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
   <script>
     // Decide the theme before drawing (no white flash). Settings: light, dark, system.
     (() => {
@@ -41,6 +42,7 @@
         },
       };
       apply(false);
+      html.classList.add("js");  // static/app.js animates; without JavaScript everything is shown at once
       systemDark.addEventListener("change", () => apply(true));  // Windows switches (e.g. at sunset)
       addEventListener("pywebviewready", () => titleBar(html.hasAttribute("data-dark"), false));
     })();

@@ -4,7 +4,7 @@
 
 Welke gegevens Garage verwerkt, waar ze staan en hoe lang. Dit is het verwerkingsoverzicht achter [PRIVACY.nl.md](../PRIVACY.nl.md) en de basis voor versleuteling (P1), bewaartermijnen (P7) en wissen (P3, P4). De betekenis per tabel en kolom staat in de [datadictionary](data-dictionary.nl.md).
 
-Stand: na versie 1.3.0, schemaversie 4 (tankbeurten F2). Werk dit bij als er een gegeven, een opslagplek of een bewaartermijn bijkomt.
+Stand: na versie 1.3.0, schemaversie 5 (kosten van bezit F5). Werk dit bij als er een gegeven, een opslagplek of een bewaartermijn bijkomt.
 
 ## Opslagplekken
 | Code | Plek | Toelichting |
@@ -37,6 +37,7 @@ Gevoeligheid: **hoog** = direct herleidbaar tot een persoon (naam, adres, contac
 | Beurt: kosten | handmatig of uit een factuur gelezen | Kostenoverzicht, export (optioneel) | laag | db, bak, pdf (tenzij "kosten niet tonen") | idem |
 | Beurt: opmerking | handmatig | Toelichting | middel (vrije tekst, staat in de verkoop-PDF, zie P6) | db, bak, pdf | idem |
 | Losse km-standen en stallingsperiodes (met opmerking) | handmatig | Km-verloop, planning | laag; opmerking middel | db, bak, pdf (km-verloop, zonder opmerking) | tot verwijderd |
+| Aankoopprijs, aankoopdatum, geschatte waarde; vaste lasten (verzekering, wegenbelasting, overig) met bedrag en periode | handmatig | Kosten van bezit (F5) | laag tot middel (financieel, over je eigen huishouden) | db, bak; **niet** in de verkoop-PDF | tot verwijderd |
 | Tankbeurten: datum, km-stand, liters, bedrag, opmerking (bijv. tankstation) | handmatig | Verbruik, brandstofkosten, km-verloop en planning | laag; opmerking middel (een vaste plek kan iets over je routes zeggen) | db, bak, pdf (alleen de km-stand, in het km-verloop) | tot verwijderd |
 | Factuur, origineel | upload | Bewijs van onderhoud; bron voor de gelakte versie | **hoog** (naam, adres, telefoon, klantnummer van de eigenaar; naam van de monteur) | fac, bak | tot de factuur, beurt of het voertuig wordt verwijderd |
 | Factuur, gelakte versie | gemaakt door Garage | Delen met een koper | laag tot middel (zo goed als het lakken) | fac, bak, pdf (alleen als gecontroleerd) | idem |
