@@ -4,7 +4,7 @@
 
 Meaning of every table and column in `onderhoud.db`, with allowed values and origin. Where data is stored and how sensitive it is, is in the [data register](data-register.md). Dutch terms and their English names: [glossary](glossary.md).
 
-Status: schema version 2 (`PRAGMA user_version`). The test `tests/test_data_dictionary.py` fails if a column in the database is missing here (in both languages); so with a new migration, add the columns here too.
+Status: schema version 3 (`PRAGMA user_version`). The test `tests/test_data_dictionary.py` fails if a column in the database is missing here (in both languages); so with a new migration, add the columns here too.
 
 ## Conventions
 - **Names** in the database are English (since migration 2). **Values** the user sees stay Dutch: vehicle types (from the RDW), document kinds, names of maintenance types and specs.
@@ -15,6 +15,7 @@ Status: schema version 2 (`PRAGMA user_version`). The test `tests/test_data_dict
 - **File paths** are relative to the data folder, with `/`, and must match `db.VALID_PATH` (`facturen/`, `beelden/` or `documenten/` + name; folder names stay Dutch because users see them). Paths outside it are refused, also from a backup.
 - **Mime types**: only `application/pdf`, `image/jpeg` and `image/png`. When shown, the extension counts, never the database value.
 - **Deleting**: all child tables have `ON DELETE CASCADE` to their vehicle or service; the app removes the related files itself. `PRAGMA secure_delete` overwrites deleted data.
+- **Encrypted** (P1, [design](encryption.md)): all files in the data folder, each with its own key in `file_key`. Encrypted text fields start with `grge:` (`db.encrypt_text`): `invoice.original_filename`, `document.original_filename` and the setting `private_terms`. A field without that prefix is not encrypted yet and gets encrypted at the next start.
 
 ## Tables
 
@@ -97,7 +98,7 @@ Attachment to a service. After redaction there are two files: the original and t
 | `id` | INTEGER | Key | | automatic |
 | `service_id` | INTEGER, required | Service | existing `service.id` | app |
 | `path` | TEXT, required | The file the app shows and exports: the redacted version if there is one, otherwise the original | `facturen/<vehicle-id>/<uuid>.<ext>` or `.../<uuid>-gelakt.<ext>` | app |
-| `original_filename` | TEXT, required | File name at upload | free | upload |
+| `original_filename` | TEXT, required | File name at upload | free, encrypted (`grge:`) | upload |
 | `mime_type` | TEXT, required | File type | see Conventions | from the extension, checked on the first bytes |
 | `original_path` | TEXT | The unredacted original | path as above, or NULL = not redacted yet (then `path` is the original) | app |
 | `reviewed` | INTEGER, required | Reviewed for personal data; only then does the invoice go into the sale PDF | `0` or `1` (default `0`) | redaction screen |
@@ -113,7 +114,7 @@ Separate documents of a vehicle. Never included in the sale PDF.
 | `kind` | TEXT, required | Kind of document | `extra.DOCUMENT_KINDS` (registration, insurance policy, purchase invoice, warranty, owner's manual, inspection report, other; Dutch labels) | list |
 | `title` | TEXT | Own description | free or NULL | manual |
 | `path` | TEXT, required | File | `documenten/<vehicle-id>/<uuid>.<ext>` | app |
-| `original_filename` | TEXT, required | File name at upload | free | upload |
+| `original_filename` | TEXT, required | File name at upload | free, encrypted (`grge:`) | upload |
 | `mime_type` | TEXT, required | File type | see Conventions | from the extension |
 | `expiry_date` | TEXT | Expires on (e.g. a policy); gives a reminder | ISO date or NULL | manual |
 | `added_on` | TEXT, required | Date added | ISO date | app |
@@ -153,6 +154,16 @@ Specs per vehicle (oil, tyres, battery, ...). The default list per type is in `e
 
 Key: (`vehicle_id`, `key`).
 
+### file_key
+The key of every encrypted file (P1). Once the row is erased, every copy of the file is unreadable, also an old version in OneDrive.
+
+| Column | Type | Meaning | Allowed values | Origin |
+|---|---|---|---|---|
+| `path` | TEXT, key | File path, see Conventions | valid file path | app |
+| `key` | BLOB, required | Key of the file (AES-256), encrypted with the master key | `crypto` format (`GRGE` + version + nonce + content) | app |
+
+No foreign key: a file without a database row (orphan) has a key as well.
+
 ### setting
 Key-value pairs for the whole app.
 
@@ -164,7 +175,10 @@ Key-value pairs for the whole app.
 | Key | Meaning | Values | Default |
 |---|---|---|---|
 | `theme` | Theme | `light`, `dark`, `system` | `system` |
-| `private_terms` | Own redaction terms (name, address), one per line; terms shorter than 3 characters do not count | free text | empty |
+| `private_terms` | Own redaction terms (name, address), one per line; terms shorter than 3 characters do not count | free text, encrypted (`grge:`) | empty |
+| `master_key_backup` | The master key, encrypted with the backup password (P2); goes into every backup and brings back the key when `garage.key` can no longer be opened | JSON from `crypto.wrap_with_password` (salt, scrypt settings, key, fingerprint) | empty until a password is set |
+| `encrypted_notice` | One-off notice after encrypting existing files (old versions in OneDrive) | `on` or empty | empty |
+| `master_key_fingerprint` | Fingerprint of the master key (`crypto.fingerprint`), not the key itself. If `garage.key` is missing while this is set, Garage does not make a new key | 16 hex characters | empty until the first start with encryption |
 | `reminders` | Windows notifications at sign-in | `on`, `off` | `on` |
 | `last_notification` | Last notification shown, to limit repeats | JSON `{"date", "time", "key"}` | empty |
 | `sketchfab_autoload` | Load the 3D model straight away instead of after a click | `on`, `off` | `off` |
@@ -198,5 +212,6 @@ Sources: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) and *Br
 |---|---|---|
 | 1 | `db._migration_1` | Baseline: the schema of Garage 1.3.0 (Dutch names). Also works on older databases without a version number (adds missing tables and columns). |
 | 2 | `db._migration_2` | English names for tables, columns, setting keys and internal values (`RENAMES_2` and related). Values the user sees stay Dutch. |
+| 3 | `db._migration_3` | Table `file_key` for encryption (P1). The existing files and fields are encrypted by `db.encrypt_existing()` at startup, not by the migration. |
 
 A new migration goes at the end of `db.MIGRATIONS` and gets a row here. Data of a newer version than the app knows is not opened and not restored.

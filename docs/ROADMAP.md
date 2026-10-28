@@ -33,8 +33,8 @@ Done is ~~struck through~~.
 ### Privacy / GDPR
 | Code | What | Why | Size |
 |---|---|---|---|
-| **P1** | Encrypt originals, documents and redaction terms with Windows DPAPI, with a migration of the existing files | The data is now readable on disk, often in OneDrive (Documents). Encryption also makes deletion effective ("crypto-shredding"). | large |
-| **P2** | Backup with a password (AES zip or `cryptography`) | A DPAPI file cannot be restored on another pc; the backup must be able to. Now everything goes to OneDrive readable. | medium |
+| ~~**P1**~~ | ~~Encrypt originals, documents and redaction terms with Windows DPAPI, with a migration of the existing files~~ ([encryption.md](encryption.md)) | The data was readable on disk, often in OneDrive (Documents). Encryption also makes deletion effective ("crypto-shredding"). | done |
+| ~~**P2**~~ | ~~Backup with a password (`cryptography`), plus recovering the key with that password~~ | A DPAPI file cannot be restored on another pc; the backup must be able to. | done |
 | **P3** | "Vehicle sold" button: make the export, then erase originals and documents; choose between an anonymised archive or everything gone; optionally clean up old backups | Storage limitation: after a sale the originals are no longer needed | medium |
 | **P4** | "Erase everything" (e.g. when selling the pc), including the list of backups | Right to erasure, made practical | small |
 | **P5** | Better redaction: ask for name and address at the first start; extra patterns (customer number, date of birth, license plate optionally); a warning without private terms | Names are now only found through own private terms | medium |
@@ -96,7 +96,7 @@ Done is ~~struck through~~.
 
 ## Suggested order
 1. ~~**Foundation:** S2, S3, G1, G2, G3.~~ Done, together with P9, P10, G9 and the conversion to English code.
-2. **Biggest privacy gain:** ~~K3~~ (done), then P1 + P2 (designed together, including migration and restore), then P3, P4 and P6.
+2. **Biggest privacy gain:** ~~K3~~, ~~P1 + P2~~ (done), then P3, P4 and P6.
 3. **Trust for the buyer:** G4, G6, G7, and with it F3.
 4. **Finishing:** S1, P5, P7, ~~P8~~ (done, with P1), G5, G8, S4, K1, K2.
 5. **Professionalisation, spread out:** K4 to K9.

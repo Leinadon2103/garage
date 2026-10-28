@@ -33,8 +33,8 @@ Gedaan staat ~~doorgestreept~~.
 ### Privacy / AVG
 | Code | Wat | Waarom | Omvang |
 |---|---|---|---|
-| **P1** | Originelen, documenten en lak-termen versleutelen met Windows DPAPI, met een migratie van de bestaande bestanden | De gegevens staan nu leesbaar op schijf, vaak in OneDrive (Documenten). Versleutelen maakt verwijderen ook effectief ("crypto-shredding"). | groot |
-| **P2** | Back-up met een wachtwoord (AES-zip of `cryptography`) | Een DPAPI-bestand is op een andere pc niet terug te zetten; de back-up moet dat wel kunnen. Nu gaat alles leesbaar naar OneDrive. | middel |
+| ~~**P1**~~ | ~~Originelen, documenten en lak-termen versleutelen met Windows DPAPI, met een migratie van de bestaande bestanden~~ ([encryption.nl.md](encryption.nl.md)) | De gegevens stonden leesbaar op schijf, vaak in OneDrive (Documenten). Versleutelen maakt verwijderen ook effectief ("crypto-shredding"). | gedaan |
+| ~~**P2**~~ | ~~Back-up met een wachtwoord (`cryptography`), plus herstel van de sleutel met dat wachtwoord~~ | Een DPAPI-bestand is op een andere pc niet terug te zetten; de back-up moet dat wel kunnen. | gedaan |
 | **P3** | Knop "Voertuig verkocht": export maken, dan originelen en documenten wissen; kiezen tussen een geanonimiseerd archief of alles weg; optioneel oude back-ups opschonen | Opslagbeperking: na verkoop zijn de originelen niet meer nodig | middel |
 | **P4** | "Alles wissen" (bijv. bij verkoop van de pc), inclusief de lijst met back-ups | Recht op vergetelheid, praktisch gemaakt | klein |
 | **P5** | Beter lakken: bij de eerste start om naam en adres vragen; extra patronen (klantnummer, geboortedatum, kenteken naar keuze); een waarschuwing zonder privé-termen | Namen worden nu alleen gevonden via eigen privé-termen | middel |
@@ -96,7 +96,7 @@ Gedaan staat ~~doorgestreept~~.
 
 ## Voorgestelde volgorde
 1. ~~**Fundament:** S2, S3, G1, G2, G3.~~ Gedaan, met P9, P10, G9 en de omzetting naar Engelse code.
-2. **Grootste privacywinst:** ~~K3~~ (gedaan), dan P1 + P2 (samen ontwerpen, inclusief migratie en terugzetten), daarna P3, P4 en P6.
+2. **Grootste privacywinst:** ~~K3~~, ~~P1 + P2~~ (gedaan), daarna P3, P4 en P6.
 3. **Vertrouwen voor de koper:** G4, G6, G7, en daarbij F3.
 4. **Afronden:** S1, P5, P7, ~~P8~~ (gedaan, met P1), G5, G8, S4, K1, K2.
 5. **Professionalisering, verspreid:** K4 t/m K9.

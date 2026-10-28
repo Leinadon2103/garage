@@ -18,9 +18,10 @@
   <h2>{{ icon("hard-drive-download") }} Back-up</h2>
   {% if message.backup == "made" %}<div class="notice ok">{{ icon("check") }}<p>Back-up gemaakt.</p></div>
   {% elif message.backup == "saved" %}<div class="notice ok">{{ icon("check") }}<p>Opgeslagen.</p></div>
+  {% elif message.backup == "password" %}<div class="notice ok">{{ icon("check") }}<p>Back-upwachtwoord opgeslagen. Nieuwe back-ups gebruiken dit wachtwoord; oudere houden het wachtwoord van toen.</p></div>
   {% elif message.backup == "error" or backup.error %}<div class="notice error">{{ icon("triangle-alert") }}<p>{{ backup.error or "Back-up mislukt." }}</p></div>{% endif %}
   <p class="muted">Een back-up bevat al je voertuigen, onderhoud, facturen (ook de niet-gelakte originelen), documenten en afbeeldingen in één zip-bestand.
-    Bewaar back-ups daarom op een plek die alleen van jou is.
+    Alles daarin is versleuteld. Bewaar back-ups toch op een plek die alleen van jou is.
     {% if backup.last %}Laatste back-up: <strong>{{ backup.last.strftime("%d-%m-%Y %H:%M") }}</strong>.{% else %}Er is nog geen back-up gemaakt.{% endif %}</p>
   {% if backup.same_drive %}<div class="notice warn">{{ icon("triangle-alert") }}<p>De back-upmap staat op dezelfde schijf als je gegevens. Kies liever een USB-stick of een cloudmap (OneDrive, Google Drive): dan ben je ook beschermd als je pc kapotgaat.</p></div>{% endif %}
   <form method="post" action="/backup/settings">
@@ -36,6 +37,27 @@
     </div>
   </form>
   <script>addEventListener("pywebviewready", () => document.getElementById("choose-folder").hidden = false);</script>
+
+  <h3 style="margin-top:24px" id="backup-password">{{ icon("shield-check") }} Back-upwachtwoord</h3>
+  {% if backup.password %}
+  <p class="muted" style="font-size:.9rem">Er is een back-upwachtwoord ingesteld. Daarmee zet je een back-up terug op een andere pc,
+    en haal je je gegevens terug als Windows opnieuw is geïnstalleerd. Wijzigen kan hieronder; oudere back-ups houden het wachtwoord van toen.</p>
+  {% else %}
+  <div class="notice warn">{{ icon("triangle-alert") }}<p>Er is nog geen back-upwachtwoord. Zonder wachtwoord kun je een back-up alleen terugzetten
+    op deze pc, met dit Windows-account. Gaat je pc kapot of installeer je Windows opnieuw, dan zijn je gegevens niet meer te openen.</p></div>
+  {% endif %}
+  <form method="post" action="/backup/password">
+    <div class="row">
+      <div style="flex:1;min-width:200px"><label for="new-password">{{ "Nieuw wachtwoord" if backup.password else "Wachtwoord" }} (minstens 12 tekens)</label>
+        <input id="new-password" type="password" name="password" minlength="12" required autocomplete="new-password"></div>
+      <div style="flex:1;min-width:200px"><label for="repeat-password">Nog een keer</label>
+        <input id="repeat-password" type="password" name="repeat" minlength="12" required autocomplete="new-password"></div>
+    </div>
+    <label class="checkbox" style="margin:14px 0"><input type="checkbox" name="understood" value="1" required>
+      Ik begrijp het: dit wachtwoord is niet te herstellen. Ben ik het kwijt én werkt mijn Windows-account niet meer, dan zijn mijn gegevens weg.
+      Ik bewaar het daarom ook ergens anders, bijvoorbeeld in een wachtwoordmanager.</label>
+    <button class="btn ghost">{{ icon("shield-check") }} Wachtwoord opslaan</button>
+  </form>
 
   <h3 style="margin-top:24px">{{ icon("archive-restore") }} Terugzetten</h3>
   <p class="muted" style="font-size:.9rem">Terugzetten vervangt al je huidige gegevens door die uit de back-up. Je huidige stand wordt eerst zelf als back-up bewaard.</p>
@@ -54,6 +76,9 @@
         onsubmit="return confirm('Al je huidige gegevens vervangen door deze back-up?')">
     <label for="backup-file" class="sr-only">Back-upbestand (zip)</label>
     <input id="backup-file" type="file" name="file" accept=".zip" required style="padding-top:9px;flex:1">
+    <label for="backup-file-password" class="sr-only">Back-upwachtwoord (alleen voor een back-up van een andere pc)</label>
+    <input id="backup-file-password" type="password" name="password" autocomplete="current-password"
+           placeholder="Wachtwoord (alleen bij een andere pc)" style="flex:1">
     <button class="btn ghost">{{ icon("upload") }} Dit bestand terugzetten</button>
   </form>
 </section>

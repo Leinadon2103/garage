@@ -15,6 +15,19 @@
     Raak je je pc kwijt, dan ben je je historie en facturen kwijt.</p>
   <form method="post" action="/backup/now"><button class="btn small">Nu back-up maken</button></form></div>
 {% endif %}
+{% if vehicles and not backup.password %}
+<div class="notice warn banner">{{ icon("shield-check") }}
+  <p>Stel een back-upwachtwoord in. Zonder wachtwoord kun je een back-up alleen op deze pc terugzetten, en zijn je gegevens
+    na een nieuwe Windows-installatie niet meer te openen.</p>
+  <a href="/settings#backup-password" class="btn small">Wachtwoord instellen</a></div>
+{% endif %}
+{% if encrypted_notice %}
+<div class="notice ok banner">{{ icon("shield-check") }}
+  <p>Je facturen, documenten en foto's zijn nu versleuteld. Let op: OneDrive bewaart oude versies van bestanden nog een tijd
+    (bij een persoonlijk account ongeveer 30 dagen). Wil je die leesbare versies meteen kwijt, verwijder ze dan in OneDrive onder
+    "Versiegeschiedenis" of leeg de OneDrive-prullenbak.</p>
+  <form method="post" action="/notice/encrypted"><button class="btn small ghost">Begrepen</button></form></div>
+{% endif %}
 
 {% if not vehicles %}
 <div class="card empty">

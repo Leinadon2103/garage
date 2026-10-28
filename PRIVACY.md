@@ -19,6 +19,8 @@ Garage is a program for your own computer. There is no account and no server of 
 
 The installed program stores this in **Documents\Garage**. If your Documents folder is in OneDrive, your data is there as well.
 
+**Encrypted:** invoices, documents and photos, and in the database your redaction terms and the original file names. The key belongs to your Windows account (DPAPI): someone who can only get at your OneDrive or your disk cannot read them. Someone logged in as you can, just like Garage itself. How it works: [encryption design](docs/encryption.md).
+
 The full overview, with purpose and retention per piece of data, is in the [data register](docs/data-register.md).
 
 ## What goes outside
@@ -29,7 +31,7 @@ Only when you use the feature:
 | Look up a vehicle, refresh RDW data | license plate, IP address | RDW Open Data (Netherlands) |
 | Search and choose an image | make and model or your search term, IP address | Sketchfab and Wikimedia Commons (US) |
 | View a 3D model | IP address | Sketchfab (US). By default only after a click, adjustable under *Settings > Privacy*. |
-| Backup to a cloud folder | everything, including the unredacted originals | the folder you choose (e.g. OneDrive) |
+| Backup to a cloud folder | everything, including the unredacted originals, but encrypted; only to be opened on this pc or with your backup password | the folder you choose (e.g. OneDrive) |
 | Reminders | nothing, the notification is local | - |
 
 Text recognition (OCR) happens offline with the built-in Windows OCR.
@@ -38,8 +40,8 @@ Text recognition (OCR) happens offline with the built-in Windows OCR.
 The sale PDF only contains invoices you have reviewed and redacted. An invoice that has not been reviewed never goes along, and neither does its file name. Documents (registration, policy) never go along. If you choose "hide costs", the amounts are redacted on the invoices too.
 
 ## Keeping and deleting
-- **Deleting a vehicle** erases the vehicle with all maintenance, invoices and documents from the app. Deleted data is really overwritten in the database, not just marked as free.
+- **Deleting a vehicle** erases the vehicle with all maintenance, invoices and documents from the app. Deleted data is really overwritten in the database, not just marked as free. The key of every file is erased first: after that, even an old version in OneDrive is unreadable.
 - **Backups** contain a copy: the last 10 automatic backups and 3 safety copies are kept. What you delete is therefore still in older backups until they are cleaned up. Delete those yourself if it must be gone straight away.
 - **Reminders** stay in the Windows notification centre until you clear them there.
 - **Uninstalling Garage** (Settings > Apps) asks whether you also want to erase your data.
-- **Taking all your data with you** is possible with a backup: one zip with everything.
+- **Taking all your data with you** is possible with a backup: one zip with everything. On another pc you open it with your backup password. If you lose that password and your Windows account no longer works, your data cannot be opened any more; there is no back door.

@@ -4,7 +4,7 @@
 <a href="/vehicles/{{ v.id }}" class="back">{{ icon("chevron-left") }} {{ v.nickname or (v.make ~ " " ~ v.model) }}</a>
 <div class="header">
   <div><div class="eyebrow">Privacy</div><h1>Persoonsgegevens weglakken</h1>
-    <p class="muted">{{ f.original_filename }}{% if remaining %} · daarna nog {{ remaining }} factu{{ "ren" if remaining > 1 else "ur" }}{% endif %}</p></div>
+    <p class="muted">{{ f.original_filename | filename }}{% if remaining %} · daarna nog {{ remaining }} factu{{ "ren" if remaining > 1 else "ur" }}{% endif %}</p></div>
 </div>
 
 <div class="redact-layout">

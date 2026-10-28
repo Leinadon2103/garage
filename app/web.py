@@ -52,6 +52,7 @@ def format_plate(plate: str) -> str:
 
 
 templates.env.filters["plate"] = format_plate
+templates.env.filters["filename"] = lambda name: db.decrypt_text(name, "original_filename")  # stored encrypted
 MONTHS = "jan feb mrt apr mei jun jul aug sep okt nov dec".split()
 templates.env.filters["short_date"] = lambda d: (lambda x: f"{x.day} {MONTHS[x.month - 1]} {x.year}")(
     date.fromisoformat(d) if isinstance(d, str) else d) if d else ""
@@ -92,7 +93,8 @@ def mime_for(path: Path) -> str:
 
 
 def file_response(rel: str | None, name: str | None, what: str = "Bestand") -> Response:
-    """A data file (invoice, document), shown inline in the app window under its original name."""
+    """A data file (invoice, document), shown inline in the app window under its original (encrypted) name."""
+    name = db.decrypt_text(name, "original_filename")
     try:
         content = db.read_file(rel)
     except ValueError:
@@ -134,10 +136,11 @@ def or_400(parser, value):
         raise HTTPException(400, str(e))
 
 
-def delete_files(paths) -> None:
+def delete_files(paths, conn=None) -> None:
+    """conn: when a write transaction is open on it (see db.write_file)."""
     for path in filter(None, paths):
         try:
-            db.delete_file(path)
+            db.delete_file(path, conn)
         except (OSError, ValueError):  # e.g. file still open in a PDF viewer; the database is already updated
             logging.warning("Could not delete %s", path)
 

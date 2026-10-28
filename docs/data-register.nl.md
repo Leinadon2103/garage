@@ -4,17 +4,18 @@
 
 Welke gegevens Garage verwerkt, waar ze staan en hoe lang. Dit is het verwerkingsoverzicht achter [PRIVACY.nl.md](../PRIVACY.nl.md) en de basis voor versleuteling (P1), bewaartermijnen (P7) en wissen (P3, P4). De betekenis per tabel en kolom staat in de [datadictionary](data-dictionary.nl.md).
 
-Stand: na versie 1.3.0, schemaversie 2. Werk dit bij als er een gegeven, een opslagplek of een bewaartermijn bijkomt.
+Stand: na versie 1.3.0, schemaversie 3 (versleuteling P1, bouwstap 3). Werk dit bij als er een gegeven, een opslagplek of een bewaartermijn bijkomt.
 
 ## Opslagplekken
 | Code | Plek | Toelichting |
 |---|---|---|
-| **db** | `onderhoud.db` in de gegevensmap | SQLite. Geïnstalleerd: `Documenten\Garage`, dus in OneDrive als Documenten daarheen is verplaatst. |
-| **fac** | `facturen\<voertuig-id>\` | Origineel `<uuid>.<ext>`, gelakte versie `<uuid>-gelakt.<ext>` |
-| **doc** | `documenten\<voertuig-id>\` | `<uuid>.<ext>` |
-| **bld** | `beelden\` | `<uuid>.jpg`, zonder EXIF |
+| **db** | `onderhoud.db` in de gegevensmap | SQLite. Geïnstalleerd: `Documenten\Garage`, dus in OneDrive als Documenten daarheen is verplaatst. Leesbaar, behalve de versleutelde velden (oorspronkelijke bestandsnamen, lak-termen) en de bestandssleutels. |
+| **key** | `garage.key` in de gegevensmap | Hoofdsleutel, beschermd met DPAPI: alleen te openen door dit Windows-account op deze pc. Gaat niet mee in de back-up. |
+| **fac** | `facturen\<voertuig-id>\` | Origineel `<uuid>.<ext>`, gelakte versie `<uuid>-gelakt.<ext>`; versleuteld |
+| **doc** | `documenten\<voertuig-id>\` | `<uuid>.<ext>`; versleuteld |
+| **bld** | `beelden\` | `<uuid>.jpg`, zonder EXIF; versleuteld |
 | **log** | `app.log` (+ `.1`, `.2`) in de gegevensmap | Foutmeldingen, max. 1 MB per deel |
-| **bak** | `Garage back-ups\` | Zip met db + alle mappen. Standaard in OneDrive, anders in de gebruikersmap, of een zelfgekozen map. |
+| **bak** | `Garage back-ups\` | Zip met db + alle mappen. Standaard in OneDrive, anders in de gebruikersmap, of een zelfgekozen map. Versleuteld (format 2): de db met de hoofdsleutel, de bestanden zoals ze zijn; met de hoofdsleutel onder het back-upwachtwoord, als dat is ingesteld. |
 | **pdf** | Waar de gebruiker de verkoop-PDF opslaat | Standaard `Downloads`; bedoeld om te delen met een koper |
 | **tmp** | `%TEMP%` en tijdelijke mappen in de gegevensmap | Zie [Tijdelijke kopieën](#tijdelijke-kopieën) |
 | **win** | Meldingencentrum van Windows | Herinneringen (toasts) blijven daar staan tot de gebruiker ze wist |
@@ -58,8 +59,8 @@ Alleen bij gebruik van de functie, zonder account of telemetrie (zie ook PRIVACY
 | Voertuig opzoeken, RDW vernieuwen | kenteken, IP-adres | RDW Open Data |
 | Beeld zoeken en kiezen | merk en model of zoekterm, IP-adres | Sketchfab, Wikimedia Commons |
 | 3D-model bekijken | IP-adres | Sketchfab |
-| Back-up naar OneDrive of een andere cloudmap | alles, ook originelen en lak-termen | de gekozen map (via de sync-client) |
-| Gegevensmap in OneDrive (Documenten verplaatst) | alles | OneDrive |
+| Back-up naar OneDrive of een andere cloudmap | alles, ook originelen en lak-termen, versleuteld (oudere back-ups van voor P1/P2 nog leesbaar) | de gekozen map (via de sync-client) |
+| Gegevensmap in OneDrive (Documenten verplaatst) | alles; bestanden en gevoelige velden versleuteld, de rest van de database leesbaar | OneDrive |
 | Verkoop-PDF | zie register, kolom pdf | wie de gebruiker die geeft |
 
 ## Tijdelijke kopieën
@@ -82,4 +83,4 @@ Punten die nog niet in de roadmap stonden of die een bestaand punt aanscherpen:
 2. ~~**Oorspronkelijke bestandsnaam in de verkoop-PDF.**~~ Opgelost met P10: foutpagina's noemen alleen het bijlagenummer, de datum en het onderhoud.
 3. ~~**Restanten na een crash.**~~ Opgelost met G9: `backup.clean_up()` bij het starten; `.deel`-bestanden bij de automatische back-upcontrole.
 4. **Meldingencentrum van Windows** bewaart de tekst van herinneringen. Laag risico, maar hoort in de privacytekst.
-5. **Lak-termen staan leesbaar in elke back-up.** Bevestigt de noodzaak van P2.
+5. ~~**Lak-termen staan leesbaar in elke back-up.**~~ Opgelost met P1 en P2: versleuteld in de database, en de database in een back-up is als geheel versleuteld. Oude back-ups van voor P1 bevatten ze nog leesbaar (opruimen: P7).

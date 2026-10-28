@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Gegevens ontgrendelen{% endblock %}
+{% block content %}
+<div class="header"><div><div class="eyebrow">Garage</div><h1>Gegevens ontgrendelen</h1></div></div>
+
+<section class="card">
+  <h2>{{ icon("shield-check") }} De sleutel van je gegevens is niet beschikbaar</h2>
+  <p class="muted">Je facturen, documenten en foto's zijn versleuteld met een sleutel die bij je Windows-account hoort.
+    Die sleutel kan Garage nu niet openen. Dat gebeurt bijvoorbeeld op een andere pc, na het opnieuw installeren van Windows,
+    of als een beheerder je Windows-wachtwoord heeft gereset.</p>
+  {% if has_password %}
+  <p>Met je back-upwachtwoord haalt Garage de sleutel terug. Daarna werkt alles weer zoals voorheen.</p>
+  <form method="post" action="/recover">
+    <label for="recover-password">Back-upwachtwoord</label>
+    <div class="search-bar">
+      <input id="recover-password" type="password" name="password" required autocomplete="current-password" autofocus>
+      <button class="btn">{{ icon("check") }} Ontgrendelen</button>
+    </div>
+  </form>
+  {% else %}
+  <div class="notice warn">{{ icon("triangle-alert") }}<p>Er is nooit een back-upwachtwoord ingesteld. Zonder dat wachtwoord kan Garage de sleutel niet terughalen.
+    Werkt je oude Windows-account nog (bijvoorbeeld op je vorige pc)? Start Garage daar: dan is alles gewoon leesbaar.</p></div>
+  {% endif %}
+  <p class="muted" style="font-size:.9rem">Er is niets gewist: je gegevens staan nog in de gegevensmap, alleen versleuteld.</p>
+</section>
+{% endblock %}

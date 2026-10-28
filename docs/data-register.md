@@ -4,17 +4,18 @@
 
 Which data Garage processes, where it is stored and for how long. This is the record of processing behind [PRIVACY.md](../PRIVACY.md) and the basis for encryption (P1), retention periods (P7) and erasure (P3, P4). The meaning per table and column is in the [data dictionary](data-dictionary.md).
 
-Status: after version 1.3.0, schema version 2. Update this when a piece of data, a storage location or a retention period is added.
+Status: after version 1.3.0, schema version 3 (encryption P1, build step 3). Update this when a piece of data, a storage location or a retention period is added.
 
 ## Storage locations
 | Code | Location | Explanation |
 |---|---|---|
-| **db** | `onderhoud.db` in the data folder | SQLite. Installed: `Documenten\Garage` (Documents), so in OneDrive if Documents has been moved there. |
-| **inv** | `facturen\<vehicle-id>\` | Original `<uuid>.<ext>`, redacted version `<uuid>-gelakt.<ext>` |
-| **doc** | `documenten\<vehicle-id>\` | `<uuid>.<ext>` |
-| **img** | `beelden\` | `<uuid>.jpg`, without EXIF |
+| **db** | `onderhoud.db` in the data folder | SQLite. Installed: `Documenten\Garage` (Documents), so in OneDrive if Documents has been moved there. Readable, except the encrypted fields (original file names, redaction terms) and the file keys. |
+| **key** | `garage.key` in the data folder | Master key, protected with DPAPI: only this Windows account on this pc can open it. Not included in the backup. |
+| **inv** | `facturen\<vehicle-id>\` | Original `<uuid>.<ext>`, redacted version `<uuid>-gelakt.<ext>`; encrypted |
+| **doc** | `documenten\<vehicle-id>\` | `<uuid>.<ext>`; encrypted |
+| **img** | `beelden\` | `<uuid>.jpg`, without EXIF; encrypted |
 | **log** | `app.log` (+ `.1`, `.2`) in the data folder | Error messages, max. 1 MB per part |
-| **bak** | `Garage back-ups\` | Zip with db + all folders. By default in OneDrive, otherwise in the user folder, or a folder of the user's choice. |
+| **bak** | `Garage back-ups\` | Zip with db + all folders. By default in OneDrive, otherwise in the user folder, or a folder of the user's choice. Encrypted (format 2): the db with the master key, the files as they are; with the master key under the backup password, if one is set. |
 | **pdf** | Wherever the user saves the sale PDF | `Downloads` by default; meant to be shared with a buyer |
 | **tmp** | `%TEMP%` and temporary folders in the data folder | See [Temporary copies](#temporary-copies) |
 | **win** | Windows notification centre | Reminders (toasts) stay there until the user clears them |
@@ -58,8 +59,8 @@ Only when the feature is used, without an account or telemetry (see also PRIVACY
 | Look up a vehicle, refresh RDW data | license plate, IP address | RDW Open Data |
 | Search and choose an image | make and model or search term, IP address | Sketchfab, Wikimedia Commons |
 | View a 3D model | IP address | Sketchfab |
-| Backup to OneDrive or another cloud folder | everything, including originals and redaction terms | the chosen folder (through the sync client) |
-| Data folder in OneDrive (Documents moved) | everything | OneDrive |
+| Backup to OneDrive or another cloud folder | everything, including originals and redaction terms, encrypted (older backups from before P1/P2 still readable) | the chosen folder (through the sync client) |
+| Data folder in OneDrive (Documents moved) | everything; files and sensitive fields encrypted, the rest of the database readable | OneDrive |
 | Sale PDF | see register, location pdf | whoever the user gives it to |
 
 ## Temporary copies
@@ -82,4 +83,4 @@ Points that were not yet on the roadmap or that sharpen an existing point:
 2. ~~**Original file name in the sale PDF.**~~ Fixed by P10: error pages only name the attachment number, the date and the maintenance.
 3. ~~**Leftovers after a crash.**~~ Fixed by G9: `backup.clean_up()` at startup; `.deel` files at the automatic backup check.
 4. **The Windows notification centre** keeps the text of reminders. Low risk, but it belongs in the privacy text.
-5. **Redaction terms are readable in every backup.** Confirms the need for P2.
+5. ~~**Redaction terms are readable in every backup.**~~ Solved by P1 and P2: encrypted in the database, and the database in a backup is encrypted as a whole. Old backups from before P1 still have them readable (cleaning up: P7).
