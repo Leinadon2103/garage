@@ -84,6 +84,7 @@
   <a class="tile" href="/vehicles/{{ v.id }}/specs">{{ icon("clipboard-list") }}<div><strong>Specificaties</strong><small class="muted">{{ specs|length }} ingevuld · olie, banden, ketting…</small></div></a>
   <a class="tile" href="/vehicles/{{ v.id }}/documents">{{ icon("folder-open") }}<div><strong>Documenten</strong><small class="muted">{{ doc_count }} opgeslagen · kenteken, verzekering…</small></div></a>
   <a class="tile" href="/vehicles/{{ v.id }}/costs">{{ icon("chart-column") }}<div><strong>Kosten &amp; km</strong><small class="muted">per jaar, per km, km-verloop</small></div></a>
+  <a class="tile" href="/vehicles/{{ v.id }}/ownership">{{ icon("receipt") }}<div><strong>Kosten van bezit</strong><small class="muted">{{ (per_month|euro ~ " per maand, alles bij elkaar") if per_month else "afschrijving, verzekering, belasting…" }}</small></div></a>
   {% if v.vehicle_type != "Aanhangwagen" %}
   <a class="tile" href="/vehicles/{{ v.id }}/fuel">{{ icon("fuel") }}<div><strong>Tanken</strong><small class="muted">{{ ("gemiddeld " ~ ("%.1f"|format(fuel_average)).replace(".", ",") ~ " l/100 km") if fuel_average else "verbruik en brandstofkosten" }}</small></div></a>
   {% endif %}

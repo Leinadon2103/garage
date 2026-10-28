@@ -4,7 +4,7 @@
 
 Betekenis van elke tabel en kolom in `onderhoud.db`, met toegestane waarden en herkomst. Waar een gegeven staat en hoe gevoelig het is, staat in het [gegevensregister](data-register.nl.md). Nederlandse termen en hun Engelse namen: [woordenlijst](glossary.md).
 
-Stand: schemaversie 4 (`PRAGMA user_version`). De test `tests/test_data_dictionary.py` faalt als een kolom in de database hier ontbreekt (in beide talen); voeg bij een nieuwe migratie dus ook de kolommen hier toe.
+Stand: schemaversie 5 (`PRAGMA user_version`). De test `tests/test_data_dictionary.py` faalt als een kolom in de database hier ontbreekt (in beide talen); voeg bij een nieuwe migratie dus ook de kolommen hier toe.
 
 ## Afspraken
 - **Namen** in de database zijn Engels (sinds migratie 2). **Waarden** die de gebruiker ziet blijven Nederlands: voertuigsoorten (van de RDW), documentsoorten, namen van onderhoudstypes en specificaties.
@@ -41,6 +41,9 @@ Voertuig: één rij per voertuig.
 | `schedule_source` | TEXT | Waar de eigen onderhoudsintervallen vandaan komen | vrij of NULL (bijv. "instructieboekje") | handmatig |
 | `rdw_json` | TEXT | Extra RDW-gegevens als JSON, zie [rdw_json](#rdw_json) | JSON-object of NULL | RDW, gefilterd door `main._rdw_extra` |
 | `rdw_updated_on` | TEXT | Datum van de laatste RDW-opzoeking | ISO-datum of NULL | app |
+| `purchase_price` | REAL | Aankoopprijs in euro's (F5) | ≥ 0 of NULL | handmatig |
+| `purchase_date` | TEXT | Aankoopdatum; begin van de afschrijving | ISO-datum, niet in de toekomst, of NULL | handmatig |
+| `current_value` | REAL | Eigen schatting van de waarde nu; NULL = vuistregel 15% waardeverlies per jaar | ≥ 0 of NULL | handmatig |
 
 ### maintenance_type
 Onderhoudstype, met een standaardinterval (de "vuistregel"). Bij een lege tabel vult `db.init()` de lijst `DEFAULT_TYPES`.
@@ -144,6 +147,19 @@ Tankbeurt (F2). Telt mee in het km-verloop; het verbruik rekent `fuel.consumptio
 | `full_tank` | INTEGER, verplicht | Volgetankt | 1 (standaard) of 0; bij 0 tellen de liters mee bij de volgende volle tank | handmatig |
 | `note` | TEXT | Opmerking, bijv. tankstation | vrij of NULL | handmatig |
 
+### fixed_cost
+Vaste last per jaar (F5): verzekering, wegenbelasting of iets anders (stalling, pechhulp). Een nieuw bedrag van dezelfde last (zelfde soort en omschrijving) vervangt het vorige vanaf zijn begindatum; `ownership.calculate` verdeelt alles over de kalenderdagen.
+
+| Kolom | Type | Betekenis | Toegestane waarden | Herkomst |
+|---|---|---|---|---|
+| `id` | INTEGER | Sleutel | | automatisch |
+| `vehicle_id` | INTEGER, verplicht | Voertuig | bestaande `vehicle.id` | app |
+| `kind` | TEXT, verplicht | Soort | `insurance`, `road_tax`, `other` | handmatig |
+| `label` | TEXT | Omschrijving | vrij, max. 60 tekens; verplicht bij `other` | handmatig |
+| `amount_per_year` | REAL, verplicht | Bedrag per jaar in euro's | > 0; ingevoerd per maand, kwartaal of jaar | handmatig |
+| `start_date` | TEXT, verplicht | Geldt vanaf | ISO-datum | handmatig |
+| `end_date` | TEXT | Geldt tot en met | ISO-datum ≥ `start_date`, of NULL (doorlopend) | handmatig |
+
 ### storage_period
 Stallingsperiode waarin het voertuig stilstaat (bijv. winterstalling). Tijdens een stalling worden geen herinneringen gestuurd.
 
@@ -228,5 +244,6 @@ Bronnen: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) en *Bra
 | 2 | `db._migration_2` | Engelse namen voor tabellen, kolommen, instellingssleutels en interne waarden (`RENAMES_2` en verwant). Waarden die de gebruiker ziet blijven Nederlands. |
 | 3 | `db._migration_3` | Tabel `file_key` voor de versleuteling (P1). De bestaande bestanden en velden versleutelt `db.encrypt_existing()` bij de start, niet de migratie. |
 | 4 | `db._migration_4` | Tabel `fuel_entry` voor tankbeurten en verbruik (F2). |
+| 5 | `db._migration_5` | Kosten van bezit (F5): aankoop en waarde in `vehicle`, tabel `fixed_cost`. |
 
 Een nieuwe migratie komt achteraan in `db.MIGRATIONS` en krijgt hier een regel. Gegevens van een nieuwere versie dan de app kent, worden niet geopend en niet teruggezet.

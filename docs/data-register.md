@@ -4,7 +4,7 @@
 
 Which data Garage processes, where it is stored and for how long. This is the record of processing behind [PRIVACY.md](../PRIVACY.md) and the basis for encryption (P1), retention periods (P7) and erasure (P3, P4). The meaning per table and column is in the [data dictionary](data-dictionary.md).
 
-Status: after version 1.3.0, schema version 4 (fill-ups F2). Update this when a piece of data, a storage location or a retention period is added.
+Status: after version 1.3.0, schema version 5 (cost of ownership F5). Update this when a piece of data, a storage location or a retention period is added.
 
 ## Storage locations
 | Code | Location | Explanation |
@@ -37,6 +37,7 @@ Sensitivity: **high** = directly traceable to a person (name, address, contact d
 | Service: cost | manual or read from an invoice | Cost overview, export (optional) | low | db, bak, pdf (unless "hide costs") | idem |
 | Service: note | manual | Explanation | medium (free text, appears in the sale PDF, see P6) | db, bak, pdf | idem |
 | Separate odometer readings and storage periods (with a note) | manual | Odometer history, planning | low; note medium | db, bak, pdf (odometer history, without the note) | until deleted |
+| Purchase price, purchase date, estimated value; fixed costs (insurance, road tax, other) with amount and period | manual | Total cost of ownership (F5) | low to medium (financial, about your own household) | db, bak; **not** in the sale PDF | until deleted |
 | Fill-ups: date, odometer reading, litres, amount, note (e.g. petrol station) | manual | Consumption, fuel costs, odometer history and planning | low; note medium (a regular place can say something about your routes) | db, bak, pdf (only the reading, in the odometer history) | until deleted |
 | Invoice, original | upload | Proof of maintenance; source of the redacted version | **high** (name, address, phone, customer number of the owner; name of the mechanic) | inv, bak | until the invoice, service or vehicle is deleted |
 | Invoice, redacted version | made by Garage | Sharing with a buyer | low to medium (as good as the redaction) | inv, bak, pdf (only when reviewed) | idem |

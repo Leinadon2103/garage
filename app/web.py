@@ -72,7 +72,7 @@ def redirect(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
 
-TABLES = {"vehicle", "service", "invoice", "document", "odometer_reading", "storage_period", "fuel_entry"}
+TABLES = {"vehicle", "service", "invoice", "document", "odometer_reading", "storage_period", "fuel_entry", "fixed_cost"}
 
 
 def fetch(conn, table: str, id_: int):
@@ -123,6 +123,8 @@ def parse_amount(value: str | None) -> float | None:
         return None
     if "," in value:  # Dutch notation: dot = thousands, comma = decimals
         value = value.replace(".", "").replace(",", ".")
+    elif re.fullmatch(r"[1-9]\d{0,2}(\.\d{3})+", value):  # '8.500' is eight and a half thousand here, not 8.5
+        value = value.replace(".", "")
     try:
         return round(float(value), 2)
     except ValueError:
