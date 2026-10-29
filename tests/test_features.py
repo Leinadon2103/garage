@@ -150,7 +150,8 @@ def test_rdw_extra_fields():
     res = rdw.lookup("00-MDB-8", httpx.Client(transport=httpx.MockTransport(rdw_fake)))
     assert res["rdw"] == {"apk_expiry_date": None, "open_recall": True, "odometer_judgement": "Niet geregistreerd",
                           "odometer_year": 2026, "list_price": 10298, "first_registration_nl_date": "2026-07-01",
-                          "curb_weight_kg": 189, "fuel": "Benzine", "power_kw": 57}
+                          "curb_weight_kg": 189, "fuel": "Benzine", "power_kw": 57,
+                          "inspections": [], "recalls": []}  # history: see tests/test_rdw_history.py
 
 
 def test_rdw_fuel_may_fail():

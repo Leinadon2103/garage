@@ -37,7 +37,7 @@ Welke gegevens Garage bewaart en wat er naar buiten gaat, staat in [PRIVACY.nl.m
 Verder: in [docs/](docs/) staan de [roadmap](docs/ROADMAP.nl.md), het [gegevensregister](docs/data-register.nl.md), de [datadictionary](docs/data-dictionary.nl.md) en een [woordenlijst](docs/glossary.md) met Nederlandse en Engelse termen.
 
 ## Wat kan het
-- **Voertuig toevoegen via kenteken.** Merk, model, bouwjaar, brandstof, vermogen en APK-datum komen uit RDW Open Data. Je ziet ook of er een terugroepactie openstaat, en of het een importvoertuig is.
+- **Voertuig toevoegen via kenteken.** Merk, model, bouwjaar, brandstof, vermogen en APK-datum komen uit RDW Open Data. Je ziet ook terugroepacties (open en hersteld, met wat er mis is), APK-keuringen waarbij gebreken zijn gevonden, en of het een importvoertuig is. Keuringen en terugroepacties gaan ook mee in de verkoop-PDF.
 - **Factuur inladen.** Bij een PDF met tekst worden bedrag, datum, km-stand, garage en werkzaamheden automatisch ingevuld. Bij foto's en scans vul je het zelf in.
 - **Persoonsgegevens weglakken** op facturen voordat ze in de verkoop-PDF komen. Het origineel blijft alleen voor jou bewaard.
 - **Binnenkort nodig:** per onderhoud zie je wanneer het weer nodig is, op km of tijd, wat het eerst komt.

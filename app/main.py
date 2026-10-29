@@ -248,7 +248,8 @@ RDW_FIELDS = {"apk_expiry_date", "open_recall", "odometer_judgement", "odometer_
 
 
 def _rdw_extra(raw: str) -> dict:
-    """Extra RDW data from the form; only known fields with simple values."""
+    """Extra RDW data from the form; only known fields with simple values, plus inspections and recalls in their
+    fixed shape (rdw.clean_history)."""
     try:
         data = json.loads(raw or "{}")
     except ValueError:
@@ -262,7 +263,7 @@ def _rdw_extra(raw: str) -> dict:
                 date.fromisoformat(clean[k])
         except (TypeError, ValueError):
             clean.pop(k)
-    return clean
+    return clean | rdw.clean_history(data)
 
 
 @app.get("/vehicles/{vid}")
@@ -308,9 +309,13 @@ def refresh_rdw(request: Request, vid: int):
         details = rdw.lookup(v["license_plate"])
     except rdw.RdwError as e:
         raise HTTPException(502, str(e))
+    new, old = _rdw_extra(json.dumps(details["rdw"])), _rdw_extra(v["rdw_json"])
+    for k in ("inspections", "recalls"):  # a part the RDW did not deliver this time keeps its last known value
+        if k not in new and k in old:
+            new[k] = old[k]
     with db.connect() as conn:
         conn.execute("UPDATE vehicle SET rdw_json = ?, rdw_updated_on = ? WHERE id = ?",
-                     (json.dumps(_rdw_extra(json.dumps(details["rdw"]))), date.today().isoformat(), vid))
+                     (json.dumps(new), date.today().isoformat(), vid))
     return redirect(f"/vehicles/{vid}")
 
 
@@ -378,7 +383,7 @@ def export_vehicle(vid: int, costs: int = 1):
         services = db.services(conn, vid)
         km = db.odometer_history(conn, vid)
         specs = conn.execute("SELECT * FROM spec WHERE vehicle_id = ? ORDER BY position", (vid,)).fetchall()
-    pdf = export_pdf.create(v, services, with_costs=bool(costs), km=km, specs=specs)
+    pdf = export_pdf.create(v, services, with_costs=bool(costs), km=km, specs=specs, rdw_info=_rdw_extra(v["rdw_json"]))
     name = f"onderhoudshistorie_{v['license_plate']}.pdf"
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
