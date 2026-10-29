@@ -37,7 +37,7 @@ Which data Garage stores and what goes outside is in [PRIVACY.md](PRIVACY.md) an
 More: [docs/](docs/) has the [roadmap](docs/ROADMAP.md), the [data register](docs/data-register.md), the [data dictionary](docs/data-dictionary.md) and a [glossary](docs/glossary.md) of Dutch and English terms.
 
 ## What it does
-- **Add a vehicle by license plate.** Make, model, year, fuel, power and APK date come from RDW Open Data. You also see whether there is an open recall, and whether it is an imported vehicle.
+- **Add a vehicle by license plate.** Make, model, year, fuel, power and APK date come from RDW Open Data. You also see recalls (open and fixed, with what is wrong), APK inspections at which defects were found, and whether it is an imported vehicle. Inspections and recalls also go into the sale PDF.
 - **Load an invoice.** For a PDF with text, amount, date, odometer reading, garage and work done are filled in automatically. For photos and scans you fill it in yourself.
 - **Redact personal data** on invoices before they go into the sale PDF. The original is kept for you only.
 - **Due soon:** per maintenance item you see when it is due again, by km or time, whichever comes first.

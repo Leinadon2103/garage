@@ -243,7 +243,7 @@ Instellingen: sleutel-waardeparen voor de hele app.
 `backup_folder`, `backup_auto` en `backup_last` horen bij deze pc: bij het terugzetten van een back-up blijven de huidige waarden staan.
 
 ## rdw_json
-Velden in `vehicle.rdw_json`. Alleen deze sleutels worden opgeslagen, met eenvoudige waarden (`main.RDW_FIELDS`).
+Velden in `vehicle.rdw_json`. Alleen deze sleutels worden opgeslagen: eenvoudige waarden (`main.RDW_FIELDS`) en twee lijsten met een vaste vorm (`rdw.clean_history`, met ingekorte teksten en hooguit 50 items).
 
 | Sleutel | Betekenis | Waarde | RDW-bron |
 |---|---|---|---|
@@ -256,8 +256,12 @@ Velden in `vehicle.rdw_json`. Alleen deze sleutels worden opgeslagen, met eenvou
 | `curb_weight_kg` | Massa rijklaar in kg | getal of null | `massa_rijklaar` |
 | `fuel` | Brandstof(fen), gescheiden door " + " | tekst of null | brandstofdataset, `brandstof_omschrijving` |
 | `power_kw` | Hoogste nettovermogen in kW | getal of null | brandstofdataset |
+| `inspections` | Keuringen (APK) waarbij gebreken zijn gevonden, nieuwste eerst (F3). Keuringen zonder gebreken publiceert de RDW niet. Ontbreekt de sleutel, dan is het (nog) niet opgehaald; een lege lijst betekent: geen gebreken bekend | lijst van `{date, kind, defects: [{code, description, count}]}` | gebrekendataset, `meld_datum_door_keuringsinstantie`, `soort_erkenning_omschrijving`, `gebrek_identificatie`, `aantal_gebreken_geconstateerd`; omschrijving uit *Gebreken*, geldig op de keuringsdatum |
+| `recalls` | Terugroepacties voor dit voertuig, open eerst (F3). Ontbreken: zie `inspections` | lijst van `{ref, open, status, date, manufacturer, description, consequence, remedy}` | `referentiecode_rdw`, `code_status` (`O` = open), `status`; details: `publicatiedatum_rdw`, `meldende_producent_distributeur`, `omschrijving_defect`, `materi_le_gevolgen`, `beschrijving_van_het_herstel` |
 
-Bronnen: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) en *Brandstof* (`8ys7-d773`).
+Bij het vernieuwen houdt `inspections` of `recalls` de laatst bekende waarde als de RDW dat deel even niet levert.
+
+Bronnen: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`), *Brandstof* (`8ys7-d773`), *Geconstateerde Gebreken* (`a34c-vvps`), *Gebreken* (`hx2c-gt7k`), *Terugroep_actie_status* (`t49b-isb7`) en *Terugroep_actie* (`j9yg-7rg9`).
 
 ## Schemaversies
 | Versie | Migratie | Wat |

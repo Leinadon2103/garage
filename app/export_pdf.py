@@ -78,13 +78,45 @@ def _footer(canv, doc):
     canv.restoreState()
 
 
+def _rdw_section(vehicle, rdw_info: dict, p) -> list:
+    """Inspections with defects and recalls from the RDW; empty when they were never fetched."""
+    inspections, recalls = rdw_info.get("inspections"), rdw_info.get("recalls")
+    if inspections is None and recalls is None:
+        return []
+    updated = vehicle["rdw_updated_on"] if "rdw_updated_on" in vehicle.keys() else None
+    fetched = f", opgehaald op {_nl_date(updated)}" if updated else ""
+    story = [Spacer(1, 0.5 * cm), p("Keuringen en terugroepacties", "Heading2"),
+             p(f"Bron: RDW Open Data{fetched}. De RDW publiceert alleen keuringen waarbij gebreken zijn gevonden; "
+               "een APK zonder gebreken staat hier dus niet.")]
+    if inspections:
+        rows = [["Datum", "Keuring", "Geconstateerde gebreken"]]
+        for i in inspections:
+            defects = "<br/>".join(_escape(d["description"] or f"gebrek {d['code']}") + (f" ({d['count']}x)" if d["count"] > 1 else "")
+                                   for d in i["defects"])
+            rows.append([_nl_date(i["date"]), p(_escape(i["kind"])), p(defects)])
+        story.append(_table(rows, [2.5, 4, 10.5]))
+    elif inspections is not None:
+        story.append(p("Geen keuringen met gebreken bekend bij de RDW."))
+    if recalls:
+        rows = [["Datum", "Terugroepactie", "Status"]]
+        for r in recalls:
+            text = f"<b>{_escape(r['description'] or r['ref'])}</b>"
+            if r["remedy"]:
+                text += f"<br/>Herstel: {_escape(r['remedy'])}"
+            rows.append([_nl_date(r["date"]), p(text), p(_escape(r["status"]))])
+        story += [Spacer(1, 0.3 * cm), _table(rows, [2.5, 10.5, 4])]
+    elif recalls is not None:
+        story.append(p("Geen terugroepacties bekend bij de RDW."))
+    return story
+
+
 def _overview(vehicle, services: list[dict], attachment_nrs: dict, with_costs: bool,
-              km: list[dict] | None = None, specs: list | None = None) -> bytes:
+              km: list[dict] | None = None, specs: list | None = None, rdw_info: dict | None = None) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=2 * cm,
                             bottomMargin=2 * cm, title=f"Onderhoudshistorie {vehicle['license_plate']}")
     p = lambda text, style="BodyText": Paragraph(text, STYLES[style])
-    km = km or []
+    km, rdw_info = km or [], rdw_info or {}
     current_km = max((r["odometer_km"] for r in km), default=None) if km else \
         max((s["odometer_km"] for s in services if s["odometer_km"] is not None), default=None)
 
@@ -95,6 +127,7 @@ def _overview(vehicle, services: list[dict], attachment_nrs: dict, with_costs: b
         ["Eerste toelating", _nl_date(vehicle["first_registration_date"])],
         ["Kleur", vehicle["color"] or ""],
         ["Laatst bekende km-stand", _km(current_km)],
+        ["APK geldig tot", _nl_date(rdw_info.get("apk_expiry_date"))],
         ["Aantal onderhoudsbeurten", str(len(services))],
         ["Datum uitdraai", date.today().strftime("%d-%m-%Y")],
     ]
@@ -151,6 +184,7 @@ def _overview(vehicle, services: list[dict], attachment_nrs: dict, with_costs: b
                   _table([["Datum", "Km-stand", "Vastgelegd bij"]] +
                          [[_nl_date(r["date"]), _km(r["odometer_km"]), source.get(r["source"], r["source"])] for r in km],
                          [4, 4, 9])]
+    story += _rdw_section(vehicle, rdw_info, p)
     if specs:
         story += [Spacer(1, 0.5 * cm), p("Specificaties", "Heading2"),
                   _table([["Onderdeel", "Waarde"]] + [[p(_escape(s["key"])), p(_escape(s["value"]))] for s in specs], [6, 11])]
@@ -221,7 +255,7 @@ def read_pdf(source) -> PdfReader:
 
 
 def create(vehicle, services: list[dict], with_costs: bool = True, km: list[dict] | None = None,
-           specs: list | None = None) -> bytes:
+           specs: list | None = None, rdw_info: dict | None = None) -> bytes:
     chronological = sorted(services, key=lambda s: (s["date"], s["id"]))
     attachments = [(s, f) for s in chronological for f in s["invoices"]]
     attachment_nrs = {f["id"]: i for i, (_, f) in enumerate(attachments, start=1)}
@@ -229,7 +263,7 @@ def create(vehicle, services: list[dict], with_costs: bool = True, km: list[dict
     # Error pages name the attachment only through the header (number, date, maintenance), never through the
     # original file name: that can contain a name, e.g. 'factuur Jansen.pdf'.
     writer = PdfWriter()
-    writer.append(PdfReader(io.BytesIO(_overview(vehicle, services, attachment_nrs, with_costs, km, specs))))
+    writer.append(PdfReader(io.BytesIO(_overview(vehicle, services, attachment_nrs, with_costs, km, specs, rdw_info))))
 
     for nr, (s, f) in enumerate(attachments, start=1):
         header = (f"Bijlage {nr} - {date.fromisoformat(s['date']).strftime('%d-%m-%Y')} - "

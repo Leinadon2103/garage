@@ -92,10 +92,12 @@
   <a class="tile sec-neutral" href="/vehicles/{{ v.id }}/storage">{{ icon("snowflake") }}<div><strong>{{ "Uit de stalling" if storage else "Stalling" }}</strong><small class="muted">checklist {{ "ophalen" if storage else "wegzetten" }}</small></div></a>
 </div>
 
-{% if rdw_info.open_recall %}
+{% set open_recalls = (rdw_info.recalls or [])|selectattr("open")|list %}
+{% if rdw_info.open_recall or open_recalls %}
 <div class="notice error" style="margin-top:24px">{{ icon("triangle-alert") }}
   <p><strong>Openstaande terugroepactie.</strong> Volgens de RDW heeft de fabrikant dit voertuig teruggeroepen en is dat nog niet afgehandeld.
-    Neem contact op met een dealer van {{ v.make or "het merk" }}; meestal is dit gratis.</p></div>
+    Neem contact op met een dealer van {{ v.make or "het merk" }}; meestal is dit gratis.
+    {% if open_recalls %}<a href="#rdw-history">Wat is er aan de hand?</a>{% endif %}</p></div>
 {% endif %}
 
 <div class="card rdw-block" style="margin-top:16px">
@@ -107,10 +109,46 @@
     <strong>{{ icon("gauge", "accent") }} RDW-oordeel over de tellerstand:
       {{ judgement.get(rdw_info.odometer_judgement, rdw_info.odometer_judgement or "onbekend") }}</strong>
     <p class="muted">De kilometerstand zelf is niet openbaar. Die vind je alleen in een betaald NAP-tellerrapport of bij de vorige eigenaar of dealer.
-      {% if v.rdw_updated_on %}RDW-gegevens van {{ v.rdw_updated_on|short_date }}.{% endif %}</p>
+      {% if v.rdw_updated_on %}RDW-gegevens van {{ v.rdw_updated_on|short_date }}.{% endif %}
+      {% if rdw_info.inspections is not defined and rdw_info.recalls is not defined %}Vernieuw om ook keuringen en terugroepacties op te halen.{% endif %}</p>
   </div>
   <form method="post" action="/vehicles/{{ v.id }}/rdw"><button class="btn ghost small">{{ icon("rotate-3d") }} Vernieuwen bij RDW</button></form>
 </div>
+
+{% if rdw_info.inspections is defined or rdw_info.recalls is defined %}
+<section class="section sec-neutral" id="rdw-history">
+  <h2>{{ icon("shield-check") }} Keuringen en terugroepacties</h2>
+  <div class="rdw-history">
+    <div class="card">
+      <h3>Keuringen met gebreken</h3>
+      <p class="muted">De RDW publiceert alleen keuringen waarbij een gebrek is gevonden. Een APK zonder gebreken staat hier dus niet.</p>
+      {% if rdw_info.inspections %}
+      <ul class="rdw-list">
+        {% for i in rdw_info.inspections %}
+        <li><strong>{{ i.date|short_date }}</strong> <span class="muted">{{ i.kind }}</span>
+          <ul>{% for d in i.defects %}<li>{{ d.description or ("gebrek " ~ d.code) }}{% if d.count > 1 %} ({{ d.count }}x){% endif %}</li>{% endfor %}</ul></li>
+        {% endfor %}
+      </ul>
+      {% elif rdw_info.inspections is defined %}<p>Geen keuringen met gebreken bekend.</p>
+      {% else %}<p class="muted">Kon niet worden opgehaald. Probeer het later opnieuw met Vernieuwen bij RDW.</p>{% endif %}
+    </div>
+    <div class="card">
+      <h3>Terugroepacties</h3>
+      {% if rdw_info.recalls %}
+      {% for r in rdw_info.recalls %}
+      <details class="recall"{% if r.open %} open{% endif %}>
+        <summary><span class="chip {{ 'bad' if r.open else 'ok' }}">{{ "Open" if r.open else "Hersteld" }}</span> {{ r.description or r.ref }}</summary>
+        {% if r.consequence %}<p><strong>Gevolg:</strong> {{ r.consequence }}</p>{% endif %}
+        {% if r.remedy %}<p><strong>Herstel:</strong> {{ r.remedy }}</p>{% endif %}
+        <p class="muted">{{ r.status }}{% if r.date %} · gepubliceerd {{ r.date|short_date }}{% endif %}{% if r.manufacturer %} · {{ r.manufacturer }}{% endif %} · RDW {{ r.ref }}</p>
+      </details>
+      {% endfor %}
+      {% elif rdw_info.recalls is defined %}<p>Geen terugroepacties bekend.</p>
+      {% else %}<p class="muted">Kon niet worden opgehaald. Probeer het later opnieuw met Vernieuwen bij RDW.</p>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {% if unreviewed %}
 <div class="notice warn" style="margin-top:24px">{{ icon("shield-check") }}

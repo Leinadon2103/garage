@@ -243,7 +243,7 @@ Key-value pairs for the whole app.
 `backup_folder`, `backup_auto` and `backup_last` belong to this pc: when a backup is restored, the current values stay.
 
 ## rdw_json
-Fields in `vehicle.rdw_json`. Only these keys are stored, with simple values (`main.RDW_FIELDS`).
+Fields in `vehicle.rdw_json`. Only these keys are stored: simple values (`main.RDW_FIELDS`) and two lists with a fixed shape (`rdw.clean_history`, with shortened texts and at most 50 items).
 
 | Key | Meaning | Value | RDW source |
 |---|---|---|---|
@@ -256,8 +256,12 @@ Fields in `vehicle.rdw_json`. Only these keys are stored, with simple values (`m
 | `curb_weight_kg` | Curb weight in kg | number or null | `massa_rijklaar` |
 | `fuel` | Fuel(s), separated by " + " | text or null | fuel dataset, `brandstof_omschrijving` |
 | `power_kw` | Highest net power in kW | number or null | fuel dataset |
+| `inspections` | Inspections (APK) at which defects were found, newest first (F3). The RDW does not publish inspections without defects. A missing key means not fetched (yet); an empty list means no defects known | list of `{date, kind, defects: [{code, description, count}]}` | defects dataset, `meld_datum_door_keuringsinstantie`, `soort_erkenning_omschrijving`, `gebrek_identificatie`, `aantal_gebreken_geconstateerd`; description from *Gebreken*, valid on the inspection date |
+| `recalls` | Recalls for this vehicle, open ones first (F3). Missing: see `inspections` | list of `{ref, open, status, date, manufacturer, description, consequence, remedy}` | `referentiecode_rdw`, `code_status` (`O` = open), `status`; details: `publicatiedatum_rdw`, `meldende_producent_distributeur`, `omschrijving_defect`, `materi_le_gevolgen`, `beschrijving_van_het_herstel` |
 
-Sources: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`) and *Brandstof* (`8ys7-d773`).
+On a refresh, `inspections` or `recalls` keeps its last known value when the RDW does not deliver that part this time.
+
+Sources: RDW Open Data, datasets *Gekentekende voertuigen* (`m9d7-ebf2`), *Brandstof* (`8ys7-d773`), *Geconstateerde Gebreken* (`a34c-vvps`), *Gebreken* (`hx2c-gt7k`), *Terugroep_actie_status* (`t49b-isb7`) and *Terugroep_actie* (`j9yg-7rg9`).
 
 ## Schema versions
 | Version | Migration | What |

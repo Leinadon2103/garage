@@ -30,7 +30,7 @@ Gevoeligheid: **hoog** = direct herleidbaar tot een persoon (naam, adres, contac
 | Kenteken | RDW-opzoeking of handmatig | Voertuig herkennen, RDW-gegevens ophalen | middel (indirect herleidbaar tot de eigenaar) | db, bak, pdf | tot het voertuig wordt verwijderd |
 | Voertuiggegevens (soort, merk, model, kleur, cilinderinhoud, datum eerste toelating) | RDW of handmatig | Overzicht, planning, export | laag | db, bak, pdf | idem |
 | Bijnaam van het voertuig | handmatig | Herkenbaarheid in de app en meldingen | laag (vrije tekst) | db, bak, win | idem |
-| Extra RDW-gegevens (APK-datum, terugroepactie, tellerstandoordeel, catalogusprijs, datum tenaamstelling NL, massa, brandstof, vermogen) | RDW Open Data | Planning (APK), informatie voor de koper | laag | db (`rdw_json`), bak, pdf | idem; wordt overschreven bij vernieuwen |
+| Extra RDW-gegevens (APK-datum, terugroepacties met omschrijving en herstel, keuringen met gebreken, tellerstandoordeel, catalogusprijs, datum tenaamstelling NL, massa, brandstof, vermogen) | RDW Open Data | Planning (APK), informatie voor de koper | laag | db (`rdw_json`), bak, pdf | idem; wordt overschreven bij vernieuwen |
 | Specificaties (olie, banden, accu, ...) | handmatig | Naslag bij onderhoud, export | laag | db, bak, pdf | idem |
 | Onderhoudsbeurt: datum, km-stand, onderhoudstypes | handmatig of uit een factuur gelezen | Historie en planning | laag | db, bak, pdf | tot de beurt of het voertuig wordt verwijderd |
 | Beurt: uitgevoerd door | handmatig of uit een factuur gelezen | Historie, vertrouwen koper | middel (kan een persoonsnaam zijn, bijv. een zelfstandige monteur) | db, bak, pdf | idem |

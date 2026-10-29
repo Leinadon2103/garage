@@ -168,6 +168,16 @@ label.upload { font-size: .95rem; font-weight: 400; margin: 0; }
 .rdw-block { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; padding: 16px 20px; }
 .rdw-info { flex: 1; min-width: 260px; }
 .rdw-info p { margin: 4px 0 0; font-size: .88rem; }
+.rdw-history { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; align-items: start; }
+.rdw-history .card { padding: 16px 20px; }
+.rdw-history p { font-size: .9rem; }
+.rdw-list { list-style: none; margin: 0; padding: 0; }
+.rdw-list > li { padding: 10px 0; border-top: 1px solid var(--line); }
+.rdw-list ul { margin: 4px 0 0; padding-left: 20px; font-size: .9rem; }
+.recall { border-top: 1px solid var(--line); padding: 10px 0; }
+.recall summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; font-weight: 600; }
+.recall summary .chip { flex: none; }
+.recall p { margin: 8px 0 0; }
 .stat small + small, .stat strong + small { display: block; font-size: .75rem; }
 .notice.read-result:not(.visible) { display: none; }
 .interval-table td:first-child { font-weight: 600; }

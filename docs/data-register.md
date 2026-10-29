@@ -30,7 +30,7 @@ Sensitivity: **high** = directly traceable to a person (name, address, contact d
 | License plate | RDW lookup or manual | Identify the vehicle, fetch RDW data | medium (indirectly traceable to the owner) | db, bak, pdf | until the vehicle is deleted |
 | Vehicle data (type, make, model, color, displacement, first registration date) | RDW or manual | Overview, planning, export | low | db, bak, pdf | idem |
 | Nickname of the vehicle | manual | Recognizability in the app and notifications | low (free text) | db, bak, win | idem |
-| Extra RDW data (APK date, recall, odometer judgement, list price, NL registration date, weight, fuel, power) | RDW Open Data | Planning (APK), information for the buyer | low | db (`rdw_json`), bak, pdf | idem; overwritten on refresh |
+| Extra RDW data (APK date, recalls with description and remedy, inspections with defects, odometer judgement, list price, NL registration date, weight, fuel, power) | RDW Open Data | Planning (APK), information for the buyer | low | db (`rdw_json`), bak, pdf | idem; overwritten on refresh |
 | Specs (oil, tyres, battery, ...) | manual | Reference during maintenance, export | low | db, bak, pdf | idem |
 | Service: date, odometer reading, maintenance types | manual or read from an invoice | History and planning | low | db, bak, pdf | until the service or the vehicle is deleted |
 | Service: performed by | manual or read from an invoice | History, buyer's trust | medium (can be a person's name, e.g. a self-employed mechanic) | db, bak, pdf | idem |

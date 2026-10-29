@@ -19,7 +19,7 @@ Stand: oktober 2026, na versie 1.3.0. Dit document is de overdracht naar een nie
 - Weglakken is echt (`apply_redactions` + `scrub`). Een ongecontroleerde factuur komt nooit in de verkoop-PDF. Van foto's wordt EXIF verwijderd.
 - Een privacyoverzicht in de app en in `PRIVACY.md`. Sketchfab laadt pas na een klik.
 - Pakketten liggen vast met hashes, met pip-audit, bandit en Dependabot (ook voor de GitHub Actions). Licentie AGPL-3.0, met `LICENSES.md`.
-- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10, G9 en K3, en de omzetting naar Engelse code (migratie 2). Daarna versleuteling van bestanden, gevoelige velden en back-ups met herstel via het back-upwachtwoord (P1, P2, P8; [encryption.nl.md](encryption.nl.md)) en tankbeurten met verbruik (F2). Schemaversie 4. Daarna kosten van bezit (F5), versie 1.4.0, en een ontwerpronde over de hele app: beweging die uitlegt (`static/app.js`, lijsten in leesvolgorde, groeiende balken, optellende getallen; uit bij "beweging beperken" in Windows) en fixes uit een rondgang als gebruiker. Versie 1.5: een kleurpalet met inktblauw en een kleur per onderdeel van de app, en een nieuw logo. Daarna onderdelen en verbruiksmaterialen (F7), schemaversie 6, versie 1.6.0. CI draait op GitHub; de repo is openbaar en `main` is beschermd (zie Werkafspraken).
+- **Na 1.3.0 gebouwd:** stap 1 (S2, S3, G1, G2, G3), P9, P10, G9 en K3, en de omzetting naar Engelse code (migratie 2). Daarna versleuteling van bestanden, gevoelige velden en back-ups met herstel via het back-upwachtwoord (P1, P2, P8; [encryption.nl.md](encryption.nl.md)) en tankbeurten met verbruik (F2). Schemaversie 4. Daarna kosten van bezit (F5), versie 1.4.0, en een ontwerpronde over de hele app: beweging die uitlegt (`static/app.js`, lijsten in leesvolgorde, groeiende balken, optellende getallen; uit bij "beweging beperken" in Windows) en fixes uit een rondgang als gebruiker. Versie 1.5: een kleurpalet met inktblauw en een kleur per onderdeel van de app, en een nieuw logo. Daarna onderdelen en verbruiksmaterialen (F7), schemaversie 6, versie 1.6.0. Daarna keuringen met gebreken en terugroepacties van de RDW op de voertuigpagina en in de verkoop-PDF (F3), opgeslagen in `rdw_json` (geen schemawijziging), versie 1.7.0. CI draait op GitHub; de repo is openbaar en `main` is beschermd (zie Werkafspraken).
 
 ## Juridisch kader (inschatting, geen juridisch advies)
 - Voor eigen gebruik valt Garage onder de **huishoudelijke uitzondering** (art. 2 lid 2 sub c AVG).
@@ -72,7 +72,7 @@ Gedaan staat ~~doorgestreept~~.
 |---|---|---|---|
 | **F1** | Agenda-export (`.ics`) van gepland onderhoud, APK en verlopende documenten | Herinneringen in je eigen agenda, volledig offline | klein |
 | ~~**F2**~~ | ~~Tankbeurten en verbruik (l/100 km, km/l), kosten per km inclusief brandstof~~ | Een veelgevraagde functie in onderhoudsapps; een completer kostenbeeld | gedaan |
-| **F3** | APK-historie en gebreken uit RDW Open Data, en details van terugroepacties | Meer waarde in de verkoop-PDF, zonder extra persoonsgegevens | middel |
+| ~~**F3**~~ | ~~APK-historie en gebreken uit RDW Open Data, en details van terugroepacties~~ (de RDW publiceert alleen keuringen met gebreken) | Meer waarde in de verkoop-PDF, zonder extra persoonsgegevens | gedaan |
 | **F4** | Zoeken en filteren in de historie (type, garage, periode, bedrag) | Gemak bij lange historie | klein |
 | ~~**F5**~~ | ~~Totale kosten van bezit (TCO): afschrijving, verzekering, belasting en onderhoud per jaar~~ (ook brandstof en overige vaste lasten; pagina met animaties, getoetst aan de datavisualisatie-richtlijnen) | Inzicht | gedaan |
 | **F6** | Historie van de vorige eigenaar importeren (diens verkoop-PDF als bijlage bij het voertuig) | Doorlopende historie; let op persoonsgegevens van de vorige eigenaar (lakken) | middel |
@@ -99,16 +99,16 @@ Gedaan staat ~~doorgestreept~~.
 ## Voorgestelde volgorde
 1. ~~**Fundament:** S2, S3, G1, G2, G3.~~ Gedaan, met P9, P10, G9 en de omzetting naar Engelse code.
 2. **Grootste privacywinst:** ~~K3~~, ~~P1 + P2~~, ~~S4~~ (gedaan), daarna P3, P4 en P6.
-3. **Vertrouwen voor de koper:** G4, G6, G7, en daarbij F3.
+3. **Vertrouwen voor de koper:** G4, G6, G7, en daarbij ~~F3~~ (gedaan).
 4. **Afronden:** S1, P5, P7 met F11, ~~P8~~ (gedaan, met P1), G5, G8, K1, K2.
 5. **Professionalisering, verspreid:** K4 t/m K9. Gaat de app naar anderen: K4, K5 en F8 samen als release-straat, vóór S5 en F9.
-6. **Volgende stappen, gekozen door Daniel (oktober 2026):** ~~F2~~, ~~S4~~, ~~F5~~, ~~F7~~ (gedaan), dan F3, elk als eigen PR. F1 en F4 op aanvraag; F10 vervallen. Leidraad: onderhoud en een sterke verkoop-PDF gaan voor dagelijks bijhouden.
+6. **Volgende stappen, gekozen door Daniel (oktober 2026):** ~~F2~~, ~~S4~~, ~~F5~~, ~~F7~~, ~~F3~~ (gedaan), elk als eigen PR. F1 en F4 op aanvraag; F10 vervallen. Leidraad: onderhoud en een sterke verkoop-PDF gaan voor dagelijks bijhouden.
 
 ## Open beslissingen voor Daniel
 1. ~~Wordt de GitHub-repo openbaar?~~ Ja, de repo is openbaar. Nog open: gaat de app actief naar anderen? Dat bepaalt S5, F8 en F9.
 2. ~~P1: DPAPI of een eigen wachtwoord?~~ Besloten: DPAPI voor de gegevens op deze pc (P1), een wachtwoord op de back-up (P2), zodat terugzetten op een andere pc kan. Uitwerken in K6.
 3. P3: na verkoop alles wissen of een geanonimiseerd archief bewaren?
-4. ~~Welke features hebben de voorkeur?~~ Besloten: F2, S4, F5 en F7 (gedaan), dan F3, in die volgorde (zie Voorgestelde volgorde, stap 6).
+4. ~~Welke features hebben de voorkeur?~~ Besloten: F2, S4, F5, F7 en F3 (alle gedaan), in die volgorde (zie Voorgestelde volgorde, stap 6).
 5. Blijft Python 3.15 de basis? Het ecosysteem loopt nog achter (zie pyyaml, Dependabot), maar `lazy import` hangt ervan af.
 6. In welke taal schrijven we commitberichten: Engels (past bij de code) of Nederlands?
 7. ~~F10: importmap of koppelen via het lokale netwerk?~~ Vervallen met F10.
